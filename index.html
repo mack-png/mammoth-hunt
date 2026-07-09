@@ -202,8 +202,11 @@
     }
     const [lo,hi] = A.hp;
     const hp = Math.round(lo + Math.random()*(hi-lo));
+    // spawns always straddle the edge (≥1 cell on-map), so they've "entered" already —
+    // this guards against an animal stepping into the off-map void on move 1 and
+    // wandering the passable exterior forever without ever triggering termination.
     return { key, dir, exit:dir, x, y, rx:x, ry:y, hp, maxhp:hp, rate:A.step,
-             alive:true, done:false, entered:false, flash:0, prog:0, age:0,
+             alive:true, done:false, entered:true, flash:0, prog:0, age:0,
              rootT:0, spawnT:0, fleeing:false, seed:Math.random()*Math.PI*2 };
   }
 
@@ -291,8 +294,12 @@
       }
       if (best){ a.x+=best[0]; a.y+=best[1]; }
     }
-    if (anyInside(rectOf(a))) a.entered = true;
-    if (a.entered && fullyOutside(rectOf(a))){
+    const rr = rectOf(a);
+    if (anyInside(rr)) a.entered = true;
+    // done if it has left the map, OR strayed far into the exterior (backstop against
+    // an animal endlessly wandering the passable off-map void → wave never ending).
+    const strayed = rr.x < -3 || rr.x > N+2 || rr.y < -3 || rr.y > N+2;
+    if ((a.entered && fullyOutside(rr)) || strayed){
       a.done = true; a.alive = false;
       log(`… a ${A.label} slipped off the map.`);
     }
