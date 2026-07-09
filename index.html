@@ -292,10 +292,9 @@
     const A = ANIMALS[a.key];
     const r = rectOf(a);
     if (A.kind === "prey"){
-      const threats = [
-        ...state.animals.filter(x=>x.alive && ANIMALS[x.key].kind==="predator").map(rectOf),
-        ...state.hunters.map(h=>({x:h.x,y:h.y,w:1,h:1})),
-      ];
+      // Prey flee PREDATORS, not hunters — hunters are ambushers the prey walk into.
+      // (Prey still won't step onto a hunter's cell; see canOccupy avoidHunters.)
+      const threats = state.animals.filter(x=>x.alive && ANIMALS[x.key].kind==="predator").map(rectOf);
       const near = threats.length ? Math.min(...threats.map(t=>rectDist(r,t))) : 99;
       const fleeing = near <= 3 && a.age < 12;
       a.fleeing = fleeing;
