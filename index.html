@@ -5,59 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>Mammoth Hunt</title>
 <style>
-  :root{ --bg:#14110d; --panel:#1e1a14; --ink:#efe6d4; --muted:#9b8f78; --line:#37301f; --accent:#d9a441; }
+  :root{ --bg:#12100b; --panel:#1e1a13; --panel2:#26211729; --ink:#efe6d4; --muted:#9b8f78; --line:#3a3220; --accent:#e0ac4c; }
   *{ box-sizing:border-box; }
-  html,body{ margin:0; height:100%; }
-  body{ background:var(--bg); color:var(--ink);
+  html,body{ margin:0; min-height:100%; }
+  body{ background:radial-gradient(1200px 700px at 30% -10%, #241d12 0%, #12100b 60%); color:var(--ink);
     font:15px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    display:flex; align-items:flex-start; justify-content:center; padding:20px; gap:20px; flex-wrap:wrap; }
-  h1{ font-size:20px; margin:0 0 2px; letter-spacing:.5px; }
-  .sub{ color:var(--muted); font-size:12px; margin:0 0 12px; }
+    display:flex; align-items:flex-start; justify-content:center; padding:22px; gap:22px; flex-wrap:wrap; }
+  h1{ font-size:22px; margin:0 0 2px; letter-spacing:.4px; text-shadow:0 2px 12px rgba(224,172,76,.25); }
+  .sub{ color:var(--muted); font-size:12.5px; margin:0 0 12px; max-width:600px; }
   #stage{ position:relative; }
-  canvas{ background:#0e0c08; border:1px solid var(--line); border-radius:8px; touch-action:none; }
-  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; width:300px; }
-  .lvl{ font-size:13px; color:var(--muted); }
+  canvas{ display:block; border-radius:10px; touch-action:none; cursor:crosshair;
+    box-shadow:0 12px 40px rgba(0,0,0,.55), 0 0 0 1px var(--line); }
+  .panel{ background:linear-gradient(180deg,#221d15,#1a160f); border:1px solid var(--line); border-radius:12px; padding:15px 16px; width:312px; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .lvl{ font-size:13px; color:var(--muted); display:flex; justify-content:space-between; align-items:baseline; }
   .lvl b{ color:var(--ink); font-size:15px; }
-  .row{ display:flex; gap:8px; align-items:center; }
-  .weapons{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:10px 0; }
-  .wpn{ background:#262015; border:1px solid var(--line); border-radius:8px; padding:8px 4px; text-align:center; cursor:pointer; user-select:none; transition:.1s; }
-  .wpn.sel{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
-  .wpn .ico{ font-size:22px; } .wpn .nm{ font-size:12px; margin-top:2px; } .wpn .ct{ font-size:12px; color:var(--muted); }
-  button{ font:inherit; background:var(--accent); color:#1a1206; border:0; border-radius:8px; padding:9px 12px; cursor:pointer; font-weight:600; }
-  button.ghost{ background:transparent; color:var(--ink); border:1px solid var(--line); }
-  button:disabled{ opacity:.4; cursor:default; }
-  .bar{ height:12px; background:#2a2416; border-radius:6px; overflow:hidden; border:1px solid var(--line); }
-  .bar>i{ display:block; height:100%; background:linear-gradient(90deg,#b9722a,#d9a441); width:0; transition:width .3s; }
-  .stat{ display:flex; justify-content:space-between; font-size:13px; margin:6px 0; }
+  .lvl .n{ color:var(--accent); font-weight:700; }
+  .roster{ font-size:13px; color:var(--muted); margin-top:6px; }
+  .weapons{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:12px 0 8px; }
+  .wpn{ background:#2a2317; border:1px solid var(--line); border-radius:9px; padding:8px 4px 7px; text-align:center; cursor:pointer; user-select:none; transition:.12s; position:relative; }
+  .wpn:hover{ border-color:#5a4d2e; }
+  .wpn.sel{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset, 0 4px 14px rgba(224,172,76,.18); }
+  .wpn .ico{ font-size:23px; line-height:1; }
+  .wpn .nm{ font-size:12.5px; margin-top:3px; font-weight:600; }
+  .wpn .rg{ font-size:10.5px; color:var(--muted); margin-top:1px; }
+  .wpn .ct{ font-size:12px; color:var(--accent); margin-top:2px; font-weight:600; }
+  .wpn.sel .ct{ color:var(--accent); }
+  button{ font:inherit; background:linear-gradient(180deg,#e6b959,#cf9a34); color:#241703; border:0; border-radius:9px; padding:10px 12px; cursor:pointer; font-weight:700; box-shadow:0 4px 14px rgba(207,154,52,.25); }
+  button.ghost{ background:transparent; color:var(--ink); border:1px solid var(--line); box-shadow:none; font-weight:600; }
+  button:disabled{ opacity:.45; cursor:default; box-shadow:none; }
+  .bar{ height:13px; background:#2a2416; border-radius:7px; overflow:hidden; border:1px solid var(--line); margin-top:5px; }
+  .bar>i{ display:block; height:100%; width:0; border-radius:7px; background:linear-gradient(90deg,#b9722a,#e6b959); transition:width .35s cubic-bezier(.3,1,.4,1); box-shadow:0 0 12px rgba(224,172,76,.4); }
+  .stat{ display:flex; justify-content:space-between; font-size:13px; margin:12px 0 0; }
   .stat b{ color:var(--accent); }
-  #log{ height:140px; overflow-y:auto; font-size:12px; color:var(--muted); background:#17130d; border:1px solid var(--line); border-radius:8px; padding:8px; margin-top:10px; }
+  #log{ height:132px; overflow-y:auto; font-size:12px; color:var(--muted); background:#15110b; border:1px solid var(--line); border-radius:9px; padding:8px 9px; margin-top:11px; }
   #log div{ margin-bottom:3px; }
-  .legend{ font-size:11px; color:var(--muted); margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; }
-  .legend i{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:middle; }
-  .roster{ font-size:12px; color:var(--muted); margin-top:8px; }
-  .hint{ font-size:12px; color:var(--muted); margin-top:8px; min-height:32px; }
+  #log div:first-child{ color:#cdbf9f; }
+  .legend{ font-size:11px; color:var(--muted); margin-top:11px; display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; }
+  .legend i{ display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:6px; vertical-align:middle; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
+  .tips{ font-size:11.5px; color:var(--muted); margin-top:9px; line-height:1.5; border-top:1px solid var(--line); padding-top:9px; }
+  .tips b{ color:#cdbf9f; font-weight:600; }
+  .hint{ font-size:12px; color:var(--muted); margin-top:9px; min-height:30px; }
 </style>
 </head>
 <body>
   <div id="stage">
     <h1>🦣 Mammoth Hunt</h1>
-    <p class="sub">Set your ambush. Prey flee, predators hunt — terrain and position decide who feeds.</p>
+    <p class="sub">Read the herd, set your ambush. Prey flee, predators hunt — range, terrain, and timing decide who feeds.</p>
     <canvas id="c" width="600" height="600"></canvas>
   </div>
 
   <div class="panel">
-    <div class="lvl">Level <b id="levelno">1</b> — <b id="levelname">First Blood</b></div>
+    <div class="lvl"><span>Level <span class="n" id="levelno">1</span> — <b id="levelname">First Blood</b></span></div>
     <div class="roster" id="roster"></div>
-    <div class="stat" style="margin-top:10px"><span>Meat this level</span><span><b id="meat">0</b> / <span id="goal">0</span> lbs</span></div>
+    <div class="stat"><span>Meat this level</span><span><b id="meat">0</b> / <span id="goal">0</span> lbs</span></div>
     <div class="bar"><i id="meatbar"></i></div>
 
     <div class="weapons" id="weapons"></div>
-    <div class="row" style="margin-top:4px">
-      <button id="start">Start Level ▶</button>
-      <button id="reset" class="ghost">Restart Game</button>
+    <div class="row" style="display:flex; gap:8px;">
+      <button id="start" style="flex:1">Start Level ▶</button>
+      <button id="reset" class="ghost">Restart</button>
     </div>
     <div class="hint" id="hint"></div>
 
+    <div class="tips">
+      <b>🌲 Forest</b> hides hunters (predators can't target them) &amp; sharpens aim.
+      <b>🕸️ Net</b> roots big game so spears pile on. <b>🪨 Rock</b> strikes from 2 tiles — safe but weak.
+    </div>
     <div class="legend" id="legend"></div>
     <div id="log"></div>
   </div>
@@ -67,30 +80,29 @@
   "use strict";
 
   // ---- Board -----------------------------------------------------------
-  const N = 12;                       // fixed 12x12 arena
+  const N = 12;
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
   const PX = canvas.width / N;
-  const TICK = 0.20;                  // combat resolves every 0.20s
+  const TICK = 0.20;
 
-  // ---- Terrain (affects mobility + where hunters may stand) ------------
+  // ---- Terrain ---------------------------------------------------------
   const TERRAIN = {
-    grass:  { name:"Grassland", color:"#3e5b2a", speed:1.00, walkable:true,  block:false },
-    forest: { name:"Forest",    color:"#22401f", speed:0.55, walkable:true,  block:false },
-    marsh:  { name:"Marsh",     color:"#3a3d2b", speed:0.40, walkable:true,  block:false },
+    grass:  { name:"Grassland", color:"#40602a", speed:1.00, walkable:true,  block:false },
+    forest: { name:"Forest",    color:"#26451f", speed:0.55, walkable:true,  block:false },
+    marsh:  { name:"Marsh",     color:"#3d4029", speed:0.40, walkable:true,  block:false },
     water:  { name:"Water",     color:"#1d3a4a", speed:0.30, walkable:false, block:false },
     rock:   { name:"Rock",      color:"#4a4438", speed:1.00, walkable:false, block:true  },
   };
 
-  // ---- Weapons ---------------------------------------------------------
+  // ---- Weapons (distinct ranges + roles) ------------------------------
   const WEAPONS = {
-    rock: { name:"Rock",  ico:"🪨", dmg:5,  color:"#9aa0a6" },
-    spear:{ name:"Spear", ico:"🔱", dmg:10, color:"#d9a441" },
-    net:  { name:"Net",   ico:"🕸️", dmg:2,  color:"#7fb0c9" }, // snares small prey, tangles big
+    rock: { name:"Rock",  ico:"🪨", dmg:4,  range:2, color:"#b9c0c7", role:"safe chip" },
+    spear:{ name:"Spear", ico:"🔱", dmg:11, range:1, color:"#e6b959", role:"heavy, exposed" },
+    net:  { name:"Net",   ico:"🕸️", dmg:2,  range:1, color:"#8fc7e0", role:"snare & root" },
   };
 
   // ---- Animals ---------------------------------------------------------
-  // size [w,h] cells; step = grid steps/sec on grass; hit = per-tick hit odds
   const ANIMALS = {
     rabbit: { label:"Rabbit", emoji:"🐇", size:[1,1], hp:[4,6],   meat:6,   step:3.0, kind:"prey",
               hit:{rock:.30,spear:.20,net:.65}, color:"#c8b89a" },
@@ -107,7 +119,6 @@
   };
 
   // ---- Levels ----------------------------------------------------------
-  // Roster is FIXED per level. Map layout + spawn order randomize each attempt.
   const LEVELS = [
     { name:"First Blood",     goal:140,  roster:{rabbit:4,deer:3},
       terr:{forest:2,marsh:0,water:0,rock:1}, inv:{rock:5,spear:2,net:3} },
@@ -136,21 +147,16 @@
 
   function startLevel(idx) {
     const L = LEVELS[idx];
+    const terrain = makeTerrain(L.terr);
     state = Object.assign(state || {}, {
-      levelIdx: idx,
-      phase: "placing",                 // placing | running | won
-      terrain: makeTerrain(L.terr),
-      hunters: [],
-      animals: [],
-      queue: [],
-      spawnTimer: 0,
-      inv: { ...L.inv },
-      sel: state ? state.sel : "rock",
-      meat: 0,
-      acc: 0,
-      last: 0,
+      levelIdx: idx, phase: "placing", terrain,
+      hunters: [], animals: [], queue: [],
+      spawnTimer: 0, inv: { ...L.inv }, sel: state ? state.sel : "rock",
+      meat: 0, acc: 0, last: 0, clock: 0, fx: [],
+      hover: null, selHunter: null,
     });
-    log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs. New ground; place your hunters.`);
+    state.plan = buildRoster(L);   // telegraphed entry markers for this attempt
+    log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs. Read the herd, then place.`);
     renderUI();
   }
 
@@ -188,21 +194,19 @@
     if (horiz) {
       const fromLeft = Math.random() < 0.5;
       dir = { x: fromLeft ? 1 : -1, y: 0 };
-      y = pickLane(h, "h");
-      x = fromLeft ? -w+1 : N-1;
+      y = pickLane(h, "h"); x = fromLeft ? -w+1 : N-1;
     } else {
       const fromTop = Math.random() < 0.5;
       dir = { x: 0, y: fromTop ? 1 : -1 };
-      x = pickLane(w, "v");
-      y = fromTop ? -h+1 : N-1;
+      x = pickLane(w, "v"); y = fromTop ? -h+1 : N-1;
     }
     const [lo,hi] = A.hp;
     const hp = Math.round(lo + Math.random()*(hi-lo));
     return { key, dir, exit:dir, x, y, rx:x, ry:y, hp, maxhp:hp, rate:A.step,
-             alive:true, done:false, entered:false, flash:0, prog:0, age:0 };
+             alive:true, done:false, entered:false, flash:0, prog:0, age:0,
+             rootT:0, spawnT:0, fleeing:false, seed:Math.random()*Math.PI*2 };
   }
 
-  // pick an entry lane with the fewest blocking rocks in the crossing corridor
   function pickLane(span, axis) {
     let best = 0, bestBlocks = Infinity;
     for (let s=0; s<=N-span; s++){
@@ -225,16 +229,17 @@
   }
   function fullyOutside(r){ return r.x+r.w-1 < 0 || r.x >= N || r.y+r.h-1 < 0 || r.y >= N; }
   function anyInside(r){ return !fullyOutside(r); }
+  function inBounds(x,y){ return x>=0&&x<N&&y>=0&&y<N; }
+  function hunterHidden(h){ return state.terrain[h.y][h.x] === "forest"; }
   function terrainSpeedAt(a){
     const r = rectOf(a);
     const lx = Math.min(N-1, Math.max(0, a.dir.x>0 ? r.x+r.w-1 : r.x));
     const ly = Math.min(N-1, Math.max(0, a.dir.y>0 ? r.y+r.h-1 : r.y));
     return TERRAIN[state.terrain[ly][lx]].speed;
   }
-  // can this rect be occupied? blocks = rock. avoidHunters => prey won't enter hunter cells.
   function canOccupy(r, avoidHunters){
     for (let y=r.y;y<r.y+r.h;y++) for (let x=r.x;x<r.x+r.w;x++){
-      if (x<0||x>=N||y<0||y>=N) continue;            // off-map = passable (leaving)
+      if (!inBounds(x,y)) continue;
       if (TERRAIN[state.terrain[y][x]].block) return false;
     }
     if (avoidHunters) for (const hnt of state.hunters){
@@ -254,29 +259,32 @@
         ...state.hunters.map(h=>({x:h.x,y:h.y,w:1,h:1})),
       ];
       const near = threats.length ? Math.min(...threats.map(t=>rectDist(r,t))) : 99;
-      const fleeing = near <= 3 && a.age < 12;      // panic when hunted; eventually bolts for the exit
+      const fleeing = near <= 3 && a.age < 12;
+      a.fleeing = fleeing;
       let best=null, bestScore=-1e9;
       for (const [dx,dy] of DIRS){
         const nr = {x:r.x+dx, y:r.y+dy, w:r.w, h:r.h};
-        if (!canOccupy(nr, true)) continue;          // prey never enter rock or hunter cells
+        if (!canOccupy(nr, true)) continue;
         let score = 0;
         if (fleeing) score += (threats.length?Math.min(...threats.map(t=>rectDist(nr,t))):99) * 2;
-        score += (dx*a.exit.x + dy*a.exit.y) * (fleeing ? 1.2 : 3);   // head for the exit
+        score += (dx*a.exit.x + dy*a.exit.y) * (fleeing ? 1.2 : 3);
         score += Math.random()*0.3;
         if (score>bestScore){ bestScore=score; best=[dx,dy]; }
       }
       if (best){ a.x+=best[0]; a.y+=best[1]; }
     } else {
-      // predator: chase nearest prey, else nearest hunter, else leave
       let target=null, td=1e9;
       for (const p of state.animals) if (p.alive && ANIMALS[p.key].kind==="prey"){
         const d=rectDist(r, rectOf(p)); if (d<td){ td=d; target=rectOf(p); }
       }
-      for (const h of state.hunters){ const d=rectDist(r,{x:h.x,y:h.y,w:1,h:1}); if (d<td){ td=d; target={x:h.x,y:h.y,w:1,h:1}; } }
+      for (const h of state.hunters){                    // ambushing hunters in forest are unseen
+        if (hunterHidden(h)) continue;
+        const d=rectDist(r,{x:h.x,y:h.y,w:1,h:1}); if (d<td){ td=d; target={x:h.x,y:h.y,w:1,h:1}; }
+      }
       let best=null, bestScore=-1e9;
       for (const [dx,dy] of DIRS){
         const nr = {x:r.x+dx, y:r.y+dy, w:r.w, h:r.h};
-        if (!canOccupy(nr, false)) continue;         // predators may step onto prey/hunters
+        if (!canOccupy(nr, false)) continue;
         let score = target ? -rectDist(nr, target) : (dx*a.exit.x + dy*a.exit.y);
         score += Math.random()*0.2;
         if (score>bestScore){ bestScore=score; best=[dx,dy]; }
@@ -290,25 +298,37 @@
     }
   }
 
-  // ---- Combat (fixed cadence) -----------------------------------------
+  // ---- Combat ----------------------------------------------------------
+  function acx(a){ return (a.x + ANIMALS[a.key].size[0]/2)*PX; }
+  function acy(a){ return (a.y + ANIMALS[a.key].size[1]/2)*PX; }
+  function hcx(h){ return (h.x+0.5)*PX; }
+  function hcy(h){ return (h.y+0.5)*PX; }
+
   function resolveCombat(){
-    // hunters strike adjacent/overlapping animals
     for (const hnt of state.hunters){
       if (hnt.dead) continue;
       const W = WEAPONS[hnt.weapon];
+      const hidden = hunterHidden(hnt);
       for (const a of state.animals){
         if (!a.alive) continue;
         const A = ANIMALS[a.key];
-        if (rectDist(rectOf(a), {x:hnt.x,y:hnt.y,w:1,h:1}) > 1) continue;
-        if (Math.random() < A.hit[hnt.weapon]){
+        if (rectDist(rectOf(a), {x:hnt.x,y:hnt.y,w:1,h:1}) > W.range) continue;
+        const chance = Math.min(0.95, A.hit[hnt.weapon] + (hidden?0.12:0));
+        if (Math.random() < chance){
+          addFx({type:"proj", wpn:hnt.weapon, x0:hcx(hnt), y0:hcy(hnt), x1:acx(a), y1:acy(a), life:0.16});
           const area = A.size[0]*A.size[1];
-          if (hnt.weapon==="net" && area<=2){ a.hp = 0; log(`🕸️ Net snared a ${A.label}!`); }
-          else { a.hp -= W.dmg; if (hnt.weapon==="net") a.rate *= 0.75; }
+          if (hnt.weapon==="net" && A.kind==="prey" && area<=2){
+            a.hp = 0; netFx(acx(a), acy(a), "#8fc7e0"); log(`🕸️ Net snared a ${A.label}!`);
+          } else if (hnt.weapon==="net"){
+            a.hp -= W.dmg; a.rootT = Math.min(2.0, a.rootT + 1.2);
+            netFx(acx(a), acy(a), "#8fc7e0"); floatText(acx(a), acy(a)-8, "rooted", "#8fc7e0");
+          } else {
+            a.hp -= W.dmg; sparks(acx(a), acy(a), W.color, 5);
+          }
           a.flash = 1;
         }
       }
     }
-    // predators may kill prey, and overrun hunters
     for (const a of state.animals){
       if (!a.alive) continue;
       const A = ANIMALS[a.key];
@@ -317,50 +337,90 @@
       for (const p of state.animals){
         if (!p.alive || ANIMALS[p.key].kind!=="prey") continue;
         if (rectDist(r, rectOf(p)) <= 1 && Math.random() < A.attack){
-          p.alive = false;
+          p.alive = false; sparks(acx(p), acy(p), "#b22", 9);
           log(`🩸 A ${A.label} brought down a ${ANIMALS[p.key].label} — no meat for you.`);
         }
       }
       for (const hnt of state.hunters){
-        if (hnt.dead) continue;
+        if (hnt.dead || hunterHidden(hnt)) continue;      // can't kill what it can't see
         if (rectDist(r, {x:hnt.x,y:hnt.y,w:1,h:1}) <= 1 && Math.random() < A.attack){
-          hnt.dead = true;
+          hnt.dead = true; sparks(hcx(hnt), hcy(hnt), "#b22", 8); floatText(hcx(hnt), hcy(hnt)-6, "💀", "#e0574a");
           log(`💀 A ${A.label} killed your ${WEAPONS[hnt.weapon].name} hunter!`);
         }
       }
     }
-    // resolve kills → meat
     for (const a of state.animals){
       if (a.alive && a.hp <= 0){
         a.alive = false;
-        state.meat += ANIMALS[a.key].meat;
-        log(`✅ Caught a ${ANIMALS[a.key].label} — +${ANIMALS[a.key].meat} lbs (${state.meat} total).`);
+        const m = ANIMALS[a.key].meat; state.meat += m;
+        captureFx(acx(a), acy(a)); floatText(acx(a), acy(a)-10, "+"+m+" lbs", "#e6b959");
+        log(`✅ Caught a ${ANIMALS[a.key].label} — +${m} lbs (${state.meat} total).`);
+        renderMeat();
       }
     }
     state.hunters = state.hunters.filter(h=>!h.dead);
     state.animals = state.animals.filter(a=>a.alive || a.flash>0);
   }
 
+  // ---- Effects ---------------------------------------------------------
+  function addFx(o){ state.fx.push(Object.assign({t:0}, o)); }
+  function sparks(x,y,color,n){
+    for (let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, s=40+Math.random()*90;
+      addFx({type:"spark", x,y, vx:Math.cos(a)*s, vy:Math.sin(a)*s-30, color, life:0.35+Math.random()*0.25}); }
+  }
+  function floatText(x,y,str,color){ addFx({type:"text", x,y, str, color, life:1.0}); }
+  function captureFx(x,y){ addFx({type:"ring", x,y, color:"#e6b959", life:0.5}); sparks(x,y,"#e6b959",10); }
+  function netFx(x,y,color){ addFx({type:"net", x,y, color, life:0.45}); }
+
+  function updateFx(dt){
+    for (const f of state.fx){
+      f.t += dt;
+      if (f.type==="spark"){ f.x+=f.vx*dt; f.y+=f.vy*dt; f.vy+=260*dt; }
+    }
+    state.fx = state.fx.filter(f => f.t < f.life);
+  }
+  function drawFx(){
+    for (const f of state.fx){
+      const p = f.t/f.life, alpha = 1-p;
+      if (f.type==="proj"){
+        const x=f.x0+(f.x1-f.x0)*p, y=f.y0+(f.y1-f.y0)*p - Math.sin(p*Math.PI)*10;
+        ctx.globalAlpha = 1;
+        if (f.wpn==="spear"){ const ang=Math.atan2(f.y1-f.y0,f.x1-f.x0);
+          ctx.save(); ctx.translate(x,y); ctx.rotate(ang); ctx.strokeStyle="#e6b959"; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(-9,0); ctx.lineTo(7,0); ctx.stroke(); ctx.restore();
+        } else if (f.wpn==="net"){ ctx.strokeStyle="#8fc7e0"; ctx.lineWidth=1.5; ctx.strokeRect(x-5,y-5,10,10);
+        } else { ctx.fillStyle="#b9c0c7"; ctx.beginPath(); ctx.arc(x,y,4,0,7); ctx.fill(); }
+      } else if (f.type==="spark"){
+        ctx.globalAlpha=alpha; ctx.fillStyle=f.color; ctx.beginPath(); ctx.arc(f.x,f.y,2.4*alpha+0.6,0,7); ctx.fill();
+      } else if (f.type==="text"){
+        ctx.globalAlpha=Math.min(1,alpha*1.6); ctx.fillStyle=f.color; ctx.font="bold 15px ui-sans-serif,system-ui";
+        ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(f.str, f.x, f.y - p*26);
+      } else if (f.type==="ring"){
+        ctx.globalAlpha=alpha; ctx.strokeStyle=f.color; ctx.lineWidth=3*alpha+0.5;
+        ctx.beginPath(); ctx.arc(f.x,f.y, 6+p*30, 0, 7); ctx.stroke();
+      } else if (f.type==="net"){
+        ctx.globalAlpha=alpha*0.9; ctx.strokeStyle=f.color; ctx.lineWidth=1.5; const R=8+p*16;
+        for (let i=-1;i<=1;i++){ ctx.beginPath(); ctx.moveTo(f.x-R,f.y+i*R/2); ctx.lineTo(f.x+R,f.y+i*R/2); ctx.stroke();
+                                 ctx.beginPath(); ctx.moveTo(f.x+i*R/2,f.y-R); ctx.lineTo(f.x+i*R/2,f.y+R); ctx.stroke(); }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // ---- Simulation step -------------------------------------------------
   function step(dt){
     if (state.phase !== "running") return;
-
     state.spawnTimer -= dt;
-    if (state.queue.length && state.spawnTimer <= 0){
-      state.animals.push(state.queue.shift());
-      state.spawnTimer = 0.8;
-    }
+    if (state.queue.length && state.spawnTimer <= 0){ state.animals.push(state.queue.shift()); state.spawnTimer = 0.8; }
 
     for (const a of state.animals){
       if (!a.alive) continue;
-      a.age += dt;
-      a.prog += a.rate * terrainSpeedAt(a) * dt;
-      while (a.prog >= 1 && a.alive){ a.prog -= 1; aiStep(a); }
+      a.age += dt; a.spawnT = Math.min(1, a.spawnT + dt*5);
+      if (a.rootT > 0 && a.age < 14){ a.rootT = Math.max(0, a.rootT - dt); }   // netted in place
+      else { a.prog += a.rate * terrainSpeedAt(a) * dt; while (a.prog >= 1 && a.alive){ a.prog -= 1; aiStep(a); } }
     }
-
     state.acc += dt;
     while (state.acc >= TICK){ state.acc -= TICK; resolveCombat(); }
-
     for (const a of state.animals) if (a.flash>0) a.flash = Math.max(0, a.flash - dt*3);
 
     if (state.queue.length===0 && state.animals.filter(a=>a.alive).length===0) endWave();
@@ -369,154 +429,240 @@
   function endWave(){
     const L = LEVELS[state.levelIdx];
     if (state.meat >= L.goal){
-      if (state.levelIdx === LEVELS.length-1){
-        state.phase = "won";
-        log(`🏆 The Great Hunt is complete. You are the tribe's finest hunter!`);
-        renderUI();
-      } else {
-        log(`🎉 Level cleared! ${state.meat}/${L.goal} lbs. Advancing…`);
-        startLevel(state.levelIdx + 1);
-      }
+      if (state.levelIdx === LEVELS.length-1){ state.phase="won"; log(`🏆 The Great Hunt is complete. You are the tribe's finest hunter!`); renderUI(); }
+      else { log(`🎉 Level cleared! ${state.meat}/${L.goal} lbs. Advancing…`); startLevel(state.levelIdx + 1); }
     } else {
       log(`Only ${state.meat}/${L.goal} lbs — the herd got away. New ground, try again.`);
-      startLevel(state.levelIdx);       // re-randomize map + order, same roster
+      startLevel(state.levelIdx);
     }
   }
 
-  // ---- Render ----------------------------------------------------------
-  function draw(dt){
-    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
-      ctx.fillStyle = TERRAIN[state.terrain[y][x]].color;
-      ctx.fillRect(x*PX, y*PX, PX, PX);
+  // ---- Terrain rendering (textured) -----------------------------------
+  function rngFor(x,y){ let s=(x*374761393 + y*668265263 + 101)>>>0;
+    return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return s/4294967295; }; }
+  function shade(hex, f){ const n=parseInt(hex.slice(1),16); let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+    r=Math.max(0,Math.min(255,r+f)); g=Math.max(0,Math.min(255,g+f)); b=Math.max(0,Math.min(255,b+f));
+    return `rgb(${r|0},${g|0},${b|0})`; }
+
+  function drawCell(x,y){
+    const type = state.terrain[y][x], T = TERRAIN[type], rnd = rngFor(x,y);
+    const ox=x*PX, oy=y*PX;
+    ctx.fillStyle = T.color; ctx.fillRect(ox,oy,PX,PX);
+    // subtle per-cell tone variation
+    ctx.globalAlpha = 0.10; ctx.fillStyle = rnd()>0.5 ? "#fff":"#000"; ctx.fillRect(ox,oy,PX,PX); ctx.globalAlpha=1;
+    if (type==="grass"){
+      ctx.strokeStyle = shade("#40602a",-22); ctx.lineWidth=1.4;
+      for (let i=0;i<3;i++){ const gx=ox+6+rnd()*(PX-12), gy=oy+10+rnd()*(PX-14);
+        ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx-2,gy-5); ctx.moveTo(gx,gy); ctx.lineTo(gx+2,gy-5); ctx.stroke(); }
+    } else if (type==="forest"){
+      for (let i=0;i<2;i++){ const tx=ox+PX*(0.3+0.4*rnd()), ty=oy+PX*(0.35+0.4*rnd()), rr=PX*0.24;
+        ctx.fillStyle="#3a2317"; ctx.fillRect(tx-2, ty, 4, PX*0.22);
+        ctx.fillStyle=shade("#2f5324", (rnd()*30-10)|0); ctx.beginPath(); ctx.arc(tx,ty,rr,0,7); ctx.fill();
+        ctx.fillStyle="rgba(255,255,255,.08)"; ctx.beginPath(); ctx.arc(tx-rr*0.3,ty-rr*0.3,rr*0.5,0,7); ctx.fill(); }
+    } else if (type==="marsh"){
+      ctx.fillStyle="rgba(30,40,25,.5)";
+      for (let i=0;i<3;i++){ ctx.beginPath(); ctx.ellipse(ox+PX*rnd(), oy+PX*(0.3+0.5*rnd()), PX*0.22, PX*0.09, 0,0,7); ctx.fill(); }
+      ctx.strokeStyle="#5c6b32"; ctx.lineWidth=1.3;
+      for (let i=0;i<2;i++){ const rx2=ox+8+rnd()*(PX-16); ctx.beginPath(); ctx.moveTo(rx2,oy+PX-6); ctx.lineTo(rx2+ (rnd()*4-2), oy+PX-16); ctx.stroke(); }
+    } else if (type==="water"){
+      const sh = Math.sin(state.clock*1.5 + x*0.7 + y*0.5);
+      ctx.strokeStyle="rgba(150,200,220,.28)"; ctx.lineWidth=1.4;
+      for (let i=0;i<2;i++){ const wy=oy+PX*(0.35+0.3*i)+sh*2; ctx.beginPath();
+        ctx.moveTo(ox+6, wy); ctx.quadraticCurveTo(ox+PX/2, wy+3, ox+PX-6, wy); ctx.stroke(); }
+    } else if (type==="rock"){
+      for (let i=0;i<2;i++){ const bx=ox+PX*(0.28+0.44*rnd()), by=oy+PX*(0.4+0.35*rnd()), rr=PX*(0.18+0.1*rnd());
+        ctx.fillStyle=shade("#5a5347",(rnd()*20-10)|0); ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fill();
+        ctx.fillStyle="rgba(255,255,255,.12)"; ctx.beginPath(); ctx.arc(bx-rr*0.3,by-rr*0.35,rr*0.45,0,7); ctx.fill();
+        ctx.fillStyle="rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(bx,by+rr*0.8,rr,rr*0.3,0,0,7); ctx.fill(); }
     }
-    ctx.strokeStyle = "rgba(0,0,0,.22)"; ctx.lineWidth = 1;
-    for (let i=0;i<=N;i++){
-      ctx.beginPath(); ctx.moveTo(i*PX,0); ctx.lineTo(i*PX,N*PX); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,i*PX); ctx.lineTo(N*PX,i*PX); ctx.stroke();
+  }
+
+  // ---- Range / coverage helpers ---------------------------------------
+  function forRange(hx,hy,rng,cb){ for (let dy=-rng;dy<=rng;dy++) for (let dx=-rng;dx<=rng;dx++){ const x=hx+dx,y=hy+dy; if(inBounds(x,y)) cb(x,y); } }
+
+  function drawPlacingOverlay(){
+    // coverage heat-tint of every placed hunter's range
+    const cov = Array.from({length:N},()=>new Array(N).fill(0));
+    for (const h of state.hunters) forRange(h.x,h.y,WEAPONS[h.weapon].range,(x,y)=>cov[y][x]++);
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++) if (cov[y][x]>0){
+      ctx.fillStyle = `rgba(224,172,76,${Math.min(0.30, 0.05*cov[y][x]+0.05)})`;
+      ctx.fillRect(x*PX,y*PX,PX,PX);
     }
-    for (const h of state.hunters){
-      const W = WEAPONS[h.weapon];
-      ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.fillRect(h.x*PX+5, h.y*PX+5, PX-10, PX-10);
-      ctx.strokeStyle = W.color; ctx.lineWidth = 2; ctx.strokeRect(h.x*PX+5, h.y*PX+5, PX-10, PX-10);
-      ctx.font = "22px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-      ctx.fillText(W.ico, h.x*PX+PX/2, h.y*PX+PX/2+1);
+    // telegraph: where the herd enters + which way it crosses
+    for (const s of state.plan){
+      const A = ANIMALS[s.key];
+      const ex = Math.min(N-1,Math.max(0, s.dir.x>0? 0 : s.dir.x<0? N-1 : s.x));
+      const ey = Math.min(N-1,Math.max(0, s.dir.y>0? 0 : s.dir.y<0? N-1 : s.y));
+      const mx=(ex+0.5)*PX, my=(ey+0.5)*PX;
+      ctx.globalAlpha=0.5; ctx.font="18px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(A.emoji, mx, my);
+      // arrow in travel direction
+      ctx.strokeStyle=ANIMALS[s.key].kind==="predator"?"#e0574a":"#e6d38a"; ctx.lineWidth=2; ctx.globalAlpha=0.55;
+      ctx.beginPath(); ctx.moveTo(mx+s.dir.x*10, my+s.dir.y*10); ctx.lineTo(mx+s.dir.x*20, my+s.dir.y*20); ctx.stroke();
+      ctx.globalAlpha=1;
     }
-    for (const a of state.animals){
-      const A = ANIMALS[a.key], [w,h] = A.size;
-      // smooth render position toward logical cell
-      const k = Math.min(1, dt*12);
-      a.rx += (a.x - a.rx) * k; a.ry += (a.y - a.ry) * k;
-      const px=a.rx*PX, py=a.ry*PX, pw=w*PX, ph=h*PX;
-      ctx.globalAlpha = a.alive ? 1 : 0.4;
-      ctx.fillStyle = a.flash>0 ? "#e86a4c" : A.color;
-      roundRect(px+3, py+3, pw-6, ph-6, 8); ctx.fill();
-      if (ANIMALS[a.key].kind==="predator"){ ctx.strokeStyle="#e0574a"; ctx.lineWidth=2; ctx.stroke(); }
-      ctx.globalAlpha = 1;
-      ctx.font = Math.min(ph-8, 30)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
-      ctx.fillText(A.emoji, px+pw/2, py+ph/2);
-      if (a.alive){
-        const bw=pw-10, frac=Math.max(0,a.hp/a.maxhp);
-        ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(px+5, py+ph-8, bw, 4);
-        ctx.fillStyle = A.kind==="predator" ? "#e0574a" : "#8fd06a"; ctx.fillRect(px+5, py+ph-8, bw*frac, 4);
+    // hover preview
+    const hv = state.hover;
+    if (hv){
+      const onHunter = state.hunters.find(h=>h.x===hv.x&&h.y===hv.y);
+      if (onHunter){ outlineRange(onHunter.x,onHunter.y,WEAPONS[onHunter.weapon].range, WEAPONS[onHunter.weapon].color); }
+      else if (TERRAIN[state.terrain[hv.y][hv.x]].walkable && state.inv[state.sel]>0){
+        outlineRange(hv.x,hv.y,WEAPONS[state.sel].range, WEAPONS[state.sel].color);
+        ctx.globalAlpha=0.5; drawHunterToken(hv.x,hv.y,state.sel,false); ctx.globalAlpha=1;
       }
     }
+    if (state.selHunter && state.hunters.includes(state.selHunter)){
+      const s=state.selHunter; outlineRange(s.x,s.y,WEAPONS[s.weapon].range,"#fff");
+    }
   }
-  function roundRect(x,y,w,h,r){
-    ctx.beginPath(); ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  function outlineRange(hx,hy,rng,color){
+    forRange(hx,hy,rng,(x,y)=>{ ctx.fillStyle=`rgba(255,255,255,.10)`; ctx.fillRect(x*PX,y*PX,PX,PX); });
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.globalAlpha=0.9;
+    ctx.strokeRect((hx-rng)*PX+1,(hy-rng)*PX+1,(2*rng+1)*PX-2,(2*rng+1)*PX-2); ctx.globalAlpha=1;
   }
+
+  // ---- Tokens ----------------------------------------------------------
+  function drawHunterToken(x,y,weapon,hidden){
+    const W=WEAPONS[weapon], cx=(x+0.5)*PX, cy=(y+0.5)*PX, s=PX-12;
+    ctx.fillStyle="rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(cx, cy+s*0.42, s*0.44, s*0.18, 0,0,7); ctx.fill();
+    const g=ctx.createLinearGradient(0,cy-s/2,0,cy+s/2); g.addColorStop(0,"#3b3320"); g.addColorStop(1,"#241d12");
+    ctx.fillStyle=g; roundRect(cx-s/2, cy-s/2, s, s, 9); ctx.fill();
+    ctx.strokeStyle=W.color; ctx.lineWidth=2.2; roundRect(cx-s/2, cy-s/2, s, s, 9); ctx.stroke();
+    if (hidden){ ctx.fillStyle="#4c7a34"; ctx.beginPath(); ctx.arc(cx+s*0.34, cy-s*0.34, 4, 0, 7); ctx.fill(); }
+    ctx.font=(s*0.5|0)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(W.ico, cx, cy+1);
+  }
+
+  function drawAnimal(a,dt){
+    const A=ANIMALS[a.key], [w,h]=A.size;
+    const k=Math.min(1,dt*12); a.rx += (a.x-a.rx)*k; a.ry += (a.y-a.ry)*k;
+    const pw=w*PX, ph=h*PX, px=a.rx*PX, py=a.ry*PX, cx=px+pw/2, cy=py+ph/2;
+    const running = state.phase==="running";
+    const bob = (running && a.alive) ? Math.sin(state.clock*A.step*3 + a.seed)*2 : 0;
+    const jit = (a.fleeing && a.alive) ? Math.sin(state.clock*34 + a.seed)*1.5 : 0;
+    const sc = 0.45 + 0.55*(a.spawnT<1 ? (1-(1-a.spawnT)*(1-a.spawnT)) : 1);
+
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(sc,sc); ctx.translate(-cx,-cy);
+    // shadow
+    ctx.globalAlpha=a.alive?0.32:0.12; ctx.fillStyle="#000";
+    ctx.beginPath(); ctx.ellipse(cx+jit, py+ph-4, pw*0.38, ph*0.15, 0,0,7); ctx.fill(); ctx.globalAlpha=1;
+    // body
+    ctx.globalAlpha=a.alive?1:0.4;
+    const bg=ctx.createLinearGradient(0,py,0,py+ph); bg.addColorStop(0,shade2(a.flash>0?"#e86a4c":A.color,18)); bg.addColorStop(1,a.flash>0?"#c9482c":A.color);
+    ctx.fillStyle=bg; roundRect(px+3+jit, py+3+bob, pw-6, ph-6, 9); ctx.fill();
+    if (a.rootT>0){ ctx.strokeStyle="#8fc7e0"; ctx.lineWidth=2; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]); }
+    if (A.kind==="predator"){ const pulse=0.4+0.4*Math.sin(state.clock*6+a.seed);
+      ctx.strokeStyle=`rgba(224,87,74,${pulse})`; ctx.lineWidth=2.5; roundRect(px+2+jit, py+2+bob, pw-4, ph-4, 10); ctx.stroke(); }
+    // emoji (faces travel direction)
+    ctx.save(); ctx.translate(cx+jit, cy+bob); if (a.dir.x>0) ctx.scale(-1,1);
+    ctx.font=Math.min(ph-8,30)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(A.emoji,0,0); ctx.restore();
+    ctx.globalAlpha=1;
+    // hp bar
+    if (a.alive){ const bw=pw-12, frac=Math.max(0,a.hp/a.maxhp), bx=px+6, by=py+ph-7+bob;
+      ctx.fillStyle="rgba(0,0,0,.55)"; roundRect(bx,by,bw,4,2); ctx.fill();
+      ctx.fillStyle=A.kind==="predator"?"#e0574a":"#8fd06a"; roundRect(bx,by,bw*frac,4,2); ctx.fill(); }
+    ctx.restore();
+  }
+  function shade2(hex,f){ if(hex[0]!=="#") return hex; return shade(hex,f); }
+
+  // ---- Draw ------------------------------------------------------------
+  function draw(dt){
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++) drawCell(x,y);
+    ctx.strokeStyle="rgba(0,0,0,.16)"; ctx.lineWidth=1;
+    for (let i=0;i<=N;i++){ ctx.beginPath(); ctx.moveTo(i*PX,0); ctx.lineTo(i*PX,N*PX); ctx.stroke();
+                           ctx.beginPath(); ctx.moveTo(0,i*PX); ctx.lineTo(N*PX,i*PX); ctx.stroke(); }
+    if (state.phase==="placing") drawPlacingOverlay();
+    for (const h of state.hunters) drawHunterToken(h.x,h.y,h.weapon,hunterHidden(h));
+    for (const a of state.animals) drawAnimal(a,dt);
+    drawFx();
+    // vignette
+    const vg=ctx.createRadialGradient(N*PX/2,N*PX/2,N*PX*0.3,N*PX/2,N*PX/2,N*PX*0.72);
+    vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.34)");
+    ctx.fillStyle=vg; ctx.fillRect(0,0,N*PX,N*PX);
+  }
+  function roundRect(x,y,w,h,r){ r=Math.min(r,w/2,h/2);
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 
   // ---- UI --------------------------------------------------------------
+  function renderMeat(){ const L=LEVELS[state.levelIdx];
+    document.getElementById("meat").textContent=state.meat;
+    document.getElementById("meatbar").style.width=Math.min(100,state.meat/L.goal*100)+"%"; }
   function renderUI(){
-    const L = LEVELS[state.levelIdx];
-    document.getElementById("levelno").textContent = state.levelIdx+1;
-    document.getElementById("levelname").textContent = L.name;
-    document.getElementById("goal").textContent = L.goal;
-    document.getElementById("meat").textContent = state.meat;
-    document.getElementById("meatbar").style.width = Math.min(100, state.meat/L.goal*100)+"%";
-    document.getElementById("roster").textContent = "Herd: " +
-      Object.keys(L.roster).map(k=>`${ANIMALS[k].emoji}×${L.roster[k]}`).join("  ");
-
-    const wrap = document.getElementById("weapons"); wrap.innerHTML = "";
-    for (const k in WEAPONS){
-      const W = WEAPONS[k];
-      const el = document.createElement("div");
-      el.className = "wpn" + (state.sel===k?" sel":"");
-      el.innerHTML = `<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="ct">×${state.inv[k]}</div>`;
-      el.onclick = () => { state.sel=k; renderUI(); };
-      wrap.appendChild(el);
-    }
-    const start = document.getElementById("start");
-    start.disabled = state.phase==="running";
-    start.textContent = state.phase==="won" ? "You Win 🏆"
-                      : state.phase==="running" ? "Hunting…" : "Start Level ▶";
-    document.getElementById("hint").textContent = defaultHint();
-
-    document.getElementById("legend").innerHTML =
-      Object.values(TERRAIN).map(t=>`<span><i style="background:${t.color}"></i>${t.name} ×${t.speed.toFixed(2)}</span>`).join("");
+    const L=LEVELS[state.levelIdx];
+    document.getElementById("levelno").textContent=state.levelIdx+1;
+    document.getElementById("levelname").textContent=L.name;
+    document.getElementById("goal").textContent=L.goal;
+    renderMeat();
+    document.getElementById("roster").textContent="Herd: "+Object.keys(L.roster).map(k=>`${ANIMALS[k].emoji}×${L.roster[k]}`).join("  ");
+    const wrap=document.getElementById("weapons"); wrap.innerHTML="";
+    for (const k in WEAPONS){ const W=WEAPONS[k]; const el=document.createElement("div");
+      el.className="wpn"+(state.sel===k?" sel":"");
+      el.innerHTML=`<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="rg">rng ${W.range} · ${W.role}</div><div class="ct">×${state.inv[k]}</div>`;
+      el.onclick=()=>{ state.sel=k; state.selHunter=null; renderUI(); }; wrap.appendChild(el); }
+    const start=document.getElementById("start");
+    start.disabled=state.phase==="running";
+    start.textContent=state.phase==="won"?"You Win 🏆":state.phase==="running"?"Hunting…":"Start Level ▶";
+    document.getElementById("hint").textContent=defaultHint();
+    document.getElementById("legend").innerHTML=Object.values(TERRAIN).map(t=>`<span><i style="background:${t.color}"></i>${t.name} ×${t.speed.toFixed(2)}</span>`).join("");
   }
   function defaultHint(){
-    if (state.phase==="won") return "Press Restart Game to hunt again.";
+    if (state.phase==="won") return "Press Restart to hunt again.";
     if (state.phase==="running") return "The hunt is on — prey flee, predators close in.";
-    return "Pick a weapon, click land to place a hunter. Click a hunter to remove it.";
+    return "Ghosts show where the herd enters. Hover to preview range · click land to place · click a hunter to inspect, again to remove.";
   }
-  function log(msg){
-    const el = document.getElementById("log");
-    const d = document.createElement("div"); d.textContent = msg;
-    el.prepend(d); while (el.children.length>60) el.lastChild.remove();
-  }
+  function log(msg){ const el=document.getElementById("log"); const d=document.createElement("div"); d.textContent=msg;
+    el.prepend(d); while (el.children.length>60) el.lastChild.remove(); }
   let hintTimer;
-  function flashHint(t){
-    const h = document.getElementById("hint"); h.textContent = t;
-    clearTimeout(hintTimer); hintTimer = setTimeout(()=> h.textContent = defaultHint(), 1800);
-  }
+  function flashHint(t){ const h=document.getElementById("hint"); h.textContent=t; clearTimeout(hintTimer); hintTimer=setTimeout(()=>h.textContent=defaultHint(),1800); }
 
   // ---- Input -----------------------------------------------------------
-  canvas.addEventListener("pointerdown", (e)=>{
-    if (state.phase !== "placing") return;
-    const r = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX-r.left)/r.width*N);
-    const y = Math.floor((e.clientY-r.top)/r.height*N);
-    if (x<0||x>=N||y<0||y>=N) return;
-    const idx = state.hunters.findIndex(h=>h.x===x && h.y===y);
-    if (idx>=0){ state.inv[state.hunters[idx].weapon]++; state.hunters.splice(idx,1); renderUI(); return; }
-    if (!TERRAIN[state.terrain[y][x]].walkable){ flashHint("Can't stand on that terrain."); return; }
-    if (state.inv[state.sel] <= 0){ flashHint("No "+WEAPONS[state.sel].name+" hunters left."); return; }
-    state.hunters.push({ x, y, weapon: state.sel }); state.inv[state.sel]--; renderUI();
+  function cellAt(e){ const r=canvas.getBoundingClientRect();
+    return { x:Math.floor((e.clientX-r.left)/r.width*N), y:Math.floor((e.clientY-r.top)/r.height*N) }; }
+  canvas.addEventListener("pointermove",(e)=>{ if(state.phase!=="placing"){ state.hover=null; return; }
+    const c=cellAt(e); state.hover=inBounds(c.x,c.y)?c:null; });
+  canvas.addEventListener("pointerleave",()=>{ state.hover=null; });
+  canvas.addEventListener("contextmenu",(e)=>{ e.preventDefault(); if(state.phase!=="placing")return;
+    const c=cellAt(e); const i=state.hunters.findIndex(h=>h.x===c.x&&h.y===c.y);
+    if(i>=0){ state.inv[state.hunters[i].weapon]++; state.hunters.splice(i,1); state.selHunter=null; renderUI(); } });
+  canvas.addEventListener("pointerdown",(e)=>{
+    if (state.phase!=="placing") return;
+    const {x,y}=cellAt(e); if(!inBounds(x,y)) return;
+    const hit=state.hunters.find(h=>h.x===x&&h.y===y);
+    if (hit){
+      if (state.selHunter===hit){ state.inv[hit.weapon]++; state.hunters.splice(state.hunters.indexOf(hit),1); state.selHunter=null; }
+      else { state.selHunter=hit; flashHint(`${WEAPONS[hit.weapon].name} · range ${WEAPONS[hit.weapon].range}${hunterHidden(hit)?" · hidden in forest":""}. Click again to remove.`); }
+      renderUI(); return;
+    }
+    state.selHunter=null;
+    if (!TERRAIN[state.terrain[y][x]].walkable){ flashHint("Can't stand on water or rock."); return; }
+    if (state.inv[state.sel]<=0){ flashHint("No "+WEAPONS[state.sel].name+" hunters left."); return; }
+    state.hunters.push({x,y,weapon:state.sel}); state.inv[state.sel]--; renderUI();
   });
 
-  document.getElementById("start").onclick = () => {
-    if (state.phase !== "placing") return;
-    if (state.hunters.length === 0){ flashHint("Place at least one hunter first."); return; }
-    state.queue = buildRoster(LEVELS[state.levelIdx]);
-    state.phase = "running";
-    log(`The herd approaches — ${state.queue.length} animals.`);
-    renderUI();
+  document.getElementById("start").onclick=()=>{
+    if (state.phase!=="placing") return;
+    if (state.hunters.length===0){ flashHint("Place at least one hunter first."); return; }
+    state.queue=state.plan; state.plan=[]; state.phase="running"; state.selHunter=null; state.hover=null;
+    log(`The herd approaches — ${state.queue.length} animals.`); renderUI();
   };
-  document.getElementById("reset").onclick = () => { state = null; startLevel(0); };
+  document.getElementById("reset").onclick=()=>{ state=null; startLevel(0); };
 
   // ---- Boot ------------------------------------------------------------
   function frame(t){
-    if (!state.last) state.last = t;
-    const dt = Math.min(0.05, (t - state.last)/1000); state.last = t;
-    step(dt); draw(dt);
+    if (!state.last) state.last=t;
+    const dt=Math.min(0.05,(t-state.last)/1000); state.last=t;
+    state.clock+=dt; step(dt); updateFx(dt); draw(dt);
     requestAnimationFrame(frame);
   }
-  // Debug hook (harmless): lets tests drive the sim without requestAnimationFrame,
-  // which Chrome pauses in hidden/background tabs.
+  // Debug hook (harmless): drive the sim without requestAnimationFrame (paused in hidden tabs).
   window.__mh = {
     get state(){ return state; },
-    step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS,
-    autoPlace(n=6, weapon="rock"){
-      state.sel = weapon;
+    step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS, WEAPONS,
+    autoPlace(n=6, weapon="rock"){ state.sel=weapon;
       for (let y=0;y<N && state.hunters.length<n;y++) for (let x=0;x<N && state.hunters.length<n;x++){
-        if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y)){
-          if (state.inv[weapon]>0){ state.hunters.push({x,y,weapon}); state.inv[weapon]--; }
-        }
-      }
-    },
-    begin(){ state.queue = buildRoster(LEVELS[state.levelIdx]); state.phase="running"; },
+        if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y) && state.inv[weapon]>0){
+          state.hunters.push({x,y,weapon}); state.inv[weapon]--; } } },
+    begin(){ state.queue = state.plan && state.plan.length ? state.plan : buildRoster(LEVELS[state.levelIdx]); state.plan=[]; state.phase="running"; },
     run(seconds=30, dt=1/30){ let t=0; while(t<seconds && state.phase==="running"){ step(dt); t+=dt; } return {phase:state.phase, meat:state.meat, level:state.levelIdx+1}; },
   };
 
