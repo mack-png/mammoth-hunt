@@ -503,6 +503,23 @@
     step(dt); draw(dt);
     requestAnimationFrame(frame);
   }
+  // Debug hook (harmless): lets tests drive the sim without requestAnimationFrame,
+  // which Chrome pauses in hidden/background tabs.
+  window.__mh = {
+    get state(){ return state; },
+    step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS,
+    autoPlace(n=6, weapon="rock"){
+      state.sel = weapon;
+      for (let y=0;y<N && state.hunters.length<n;y++) for (let x=0;x<N && state.hunters.length<n;x++){
+        if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y)){
+          if (state.inv[weapon]>0){ state.hunters.push({x,y,weapon}); state.inv[weapon]--; }
+        }
+      }
+    },
+    begin(){ state.queue = buildRoster(LEVELS[state.levelIdx]); state.phase="running"; },
+    run(seconds=30, dt=1/30){ let t=0; while(t<seconds && state.phase==="running"){ step(dt); t+=dt; } return {phase:state.phase, meat:state.meat, level:state.levelIdx+1}; },
+  };
+
   startLevel(0);
   requestAnimationFrame(frame);
 })();
