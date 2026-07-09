@@ -156,6 +156,7 @@
       hover: null, selHunter: null,
     });
     state.plan = buildRoster(L);   // telegraphed entry markers for this attempt
+    if (idx===0 || !state.stats) state.stats = {caught:0, meat:0, huntersLost:0, preyLost:0, cleared:0};
     log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs. Read the herd, then place.`);
     renderUI();
   }
@@ -344,14 +345,14 @@
       for (const p of state.animals){
         if (!p.alive || ANIMALS[p.key].kind!=="prey") continue;
         if (rectDist(r, rectOf(p)) <= 1 && Math.random() < A.attack){
-          p.alive = false; sparks(acx(p), acy(p), "#b22", 9);
+          p.alive = false; state.stats.preyLost++; sparks(acx(p), acy(p), "#b22", 9);
           log(`🩸 A ${A.label} brought down a ${ANIMALS[p.key].label} — no meat for you.`);
         }
       }
       for (const hnt of state.hunters){
         if (hnt.dead || hunterHidden(hnt)) continue;      // can't kill what it can't see
         if (rectDist(r, {x:hnt.x,y:hnt.y,w:1,h:1}) <= 1 && Math.random() < A.attack){
-          hnt.dead = true; sparks(hcx(hnt), hcy(hnt), "#b22", 8); floatText(hcx(hnt), hcy(hnt)-6, "💀", "#e0574a");
+          hnt.dead = true; state.stats.huntersLost++; sparks(hcx(hnt), hcy(hnt), "#b22", 8); floatText(hcx(hnt), hcy(hnt)-6, "💀", "#e0574a");
           log(`💀 A ${A.label} killed your ${WEAPONS[hnt.weapon].name} hunter!`);
         }
       }
@@ -359,7 +360,7 @@
     for (const a of state.animals){
       if (a.alive && a.hp <= 0){
         a.alive = false;
-        const m = ANIMALS[a.key].meat; state.meat += m;
+        const m = ANIMALS[a.key].meat; state.meat += m; state.stats.caught++; state.stats.meat += m;
         captureFx(acx(a), acy(a)); floatText(acx(a), acy(a)-10, "+"+m+" lbs", "#e6b959");
         log(`✅ Caught a ${ANIMALS[a.key].label} — +${m} lbs (${state.meat} total).`);
         renderMeat();
@@ -436,6 +437,7 @@
   function endWave(){
     const L = LEVELS[state.levelIdx];
     if (state.meat >= L.goal){
+      state.stats.cleared++;
       if (state.levelIdx === LEVELS.length-1){ state.phase="won"; log(`🏆 The Great Hunt is complete. You are the tribe's finest hunter!`); renderUI(); }
       else { log(`🎉 Level cleared! ${state.meat}/${L.goal} lbs. Advancing…`); startLevel(state.levelIdx + 1); }
     } else {
@@ -585,6 +587,27 @@
     const vg=ctx.createRadialGradient(N*PX/2,N*PX/2,N*PX*0.3,N*PX/2,N*PX/2,N*PX*0.72);
     vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.34)");
     ctx.fillStyle=vg; ctx.fillRect(0,0,N*PX,N*PX);
+    if (state.phase==="won") drawWin();
+  }
+
+  function drawWin(){
+    const W=N*PX, s=state.stats;
+    ctx.fillStyle="rgba(10,8,4,.84)"; ctx.fillRect(0,0,W,W);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="52px serif"; ctx.fillText("🏆", W/2, W*0.24);
+    ctx.font="bold 27px ui-sans-serif,system-ui"; ctx.fillStyle="#e6b959";
+    ctx.fillText("THE GREAT HUNT COMPLETE", W/2, W*0.36);
+    ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#9b8f78";
+    ctx.fillText("You fed the tribe through all ten hunts.", W/2, W*0.42);
+    const rows=[["Levels cleared", s.cleared],["Animals caught", s.caught],
+      ["Meat harvested", s.meat+" lbs"],["Hunters lost", s.huntersLost],["Prey lost to predators", s.preyLost]];
+    ctx.font="16px ui-sans-serif,system-ui";
+    rows.forEach((r,i)=>{ const y=W*0.52 + i*30;
+      ctx.textAlign="right"; ctx.fillStyle="#cdbf9f"; ctx.fillText(r[0], W/2-12, y);
+      ctx.textAlign="left";  ctx.fillStyle="#efe6d4"; ctx.font="bold 16px ui-sans-serif,system-ui"; ctx.fillText(r[1], W/2+12, y);
+      ctx.font="16px ui-sans-serif,system-ui"; });
+    ctx.textAlign="center"; ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
+    ctx.fillText("▶  Click anywhere to hunt again", W/2, W*0.86);
   }
   function roundRect(x,y,w,h,r){ r=Math.min(r,w/2,h/2);
     ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
@@ -632,6 +655,7 @@
     const c=cellAt(e); const i=state.hunters.findIndex(h=>h.x===c.x&&h.y===c.y);
     if(i>=0){ state.inv[state.hunters[i].weapon]++; state.hunters.splice(i,1); state.selHunter=null; renderUI(); } });
   canvas.addEventListener("pointerdown",(e)=>{
+    if (state.phase==="won"){ state=null; startLevel(0); return; }
     if (state.phase!=="placing") return;
     const {x,y}=cellAt(e); if(!inBounds(x,y)) return;
     const hit=state.hunters.find(h=>h.x===x&&h.y===y);
@@ -658,7 +682,11 @@
   function frame(t){
     if (!state.last) state.last=t;
     const dt=Math.min(0.05,(t-state.last)/1000); state.last=t;
-    state.clock+=dt; step(dt); updateFx(dt); draw(dt);
+    state.clock+=dt; step(dt); updateFx(dt);
+    if (state.phase==="won") for (let i=0;i<2;i++) addFx({type:"spark", x:Math.random()*N*PX, y:-5,
+      vx:(Math.random()-0.5)*50, vy:40+Math.random()*70,
+      color:["#e6b959","#e0574a","#8fd06a","#8fc7e0","#efe6d4"][Math.floor(Math.random()*5)], life:1.6+Math.random()});
+    draw(dt);
     requestAnimationFrame(frame);
   }
   // Debug hook (harmless): drive the sim without requestAnimationFrame (paused in hidden tabs).
