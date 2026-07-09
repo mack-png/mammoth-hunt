@@ -84,6 +84,7 @@
   const ctx = canvas.getContext("2d");
   const PX = canvas.width / N;
   const TICK = 0.20;
+  const MAX_ATTEMPTS = 3;             // failed tries on a level before game over
 
   // ---- Terrain ---------------------------------------------------------
   const TERRAIN = {
@@ -123,27 +124,28 @@
   };
 
   // ---- Levels ----------------------------------------------------------
+  // goal = meat needed · time = seconds on the clock · maxLoss = hunters you may lose before it's a fail
   const LEVELS = [
-    { name:"First Blood",     goal:160,  roster:{rabbit:4,deer:3},
-      terr:{forest:2,marsh:0,water:0,rock:1}, inv:{rock:5,spear:2,net:3} },
-    { name:"The Deer Run",    goal:300,  roster:{rabbit:3,deer:6},
-      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:5,spear:3,net:3} },
-    { name:"Bison Plains",    goal:1050, roster:{deer:3,bison:3},
-      terr:{forest:1,marsh:0,water:0,rock:2}, inv:{rock:6,spear:4,net:2} },
-    { name:"Wolves at Dusk",  goal:220,  roster:{deer:5,wolf:3},
-      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:5,spear:4,net:3} },
-    { name:"Marshland",       goal:800,  roster:{rabbit:4,deer:4,bison:2},
-      terr:{forest:1,marsh:3,water:2,rock:0}, inv:{rock:6,spear:4,net:4} },
-    { name:"The Pack",        goal:230,  roster:{deer:4,wolf:5},
-      terr:{forest:4,marsh:0,water:0,rock:1}, inv:{rock:6,spear:5,net:3} },
-    { name:"Bear Country",    goal:900,  roster:{bison:3,bear:3},
-      terr:{forest:2,marsh:0,water:0,rock:3}, inv:{rock:6,spear:6,net:2} },
-    { name:"The Mammoth",     goal:1000, roster:{deer:3,bison:2,mammoth:1},
-      terr:{forest:2,marsh:1,water:0,rock:1}, inv:{rock:7,spear:6,net:3} },
-    { name:"Predator & Prey", goal:650,  roster:{deer:4,bison:2,wolf:4,bear:2},
-      terr:{forest:3,marsh:1,water:0,rock:2}, inv:{rock:7,spear:6,net:4} },
-    { name:"The Great Hunt",  goal:1050, roster:{bison:3,mammoth:2,wolf:3,bear:2},
-      terr:{forest:3,marsh:2,water:1,rock:2}, inv:{rock:8,spear:8,net:6} },
+    { name:"First Blood",     goal:120,  roster:{rabbit:4,deer:3},
+      terr:{forest:2,marsh:0,water:0,rock:1}, inv:{rock:2,spear:2,net:2}, time:32, maxLoss:1 },
+    { name:"The Deer Run",    goal:220,  roster:{rabbit:3,deer:6},
+      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:2,net:2}, time:34, maxLoss:1 },
+    { name:"Bison Plains",    goal:700,  roster:{deer:3,bison:3},
+      terr:{forest:1,marsh:0,water:0,rock:2}, inv:{rock:3,spear:3,net:2}, time:36, maxLoss:1 },
+    { name:"Wolves at Dusk",  goal:200,  roster:{deer:5,wolf:3},
+      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:3,net:3}, time:34, maxLoss:2 },
+    { name:"Marshland",       goal:520,  roster:{rabbit:4,deer:4,bison:2},
+      terr:{forest:1,marsh:3,water:2,rock:0}, inv:{rock:4,spear:3,net:3}, time:38, maxLoss:1 },
+    { name:"The Pack",        goal:220,  roster:{deer:4,wolf:5},
+      terr:{forest:4,marsh:0,water:0,rock:1}, inv:{rock:4,spear:4,net:3}, time:36, maxLoss:3 },
+    { name:"Bear Country",    goal:750,  roster:{bison:3,bear:3},
+      terr:{forest:2,marsh:0,water:0,rock:3}, inv:{rock:4,spear:4,net:3}, time:40, maxLoss:3 },
+    { name:"The Mammoth",     goal:800,  roster:{deer:3,bison:2,mammoth:1},
+      terr:{forest:2,marsh:1,water:0,rock:1}, inv:{rock:5,spear:4,net:3}, time:42, maxLoss:2 },
+    { name:"Predator & Prey", goal:600,  roster:{deer:4,bison:2,wolf:4,bear:2},
+      terr:{forest:3,marsh:1,water:0,rock:2}, inv:{rock:5,spear:5,net:4}, time:42, maxLoss:4 },
+    { name:"The Great Hunt",  goal:900,  roster:{bison:3,mammoth:2,wolf:3,bear:2},
+      terr:{forest:3,marsh:2,water:1,rock:2}, inv:{rock:6,spear:5,net:4}, time:48, maxLoss:4 },
   ];
 
   // ---- State -----------------------------------------------------------
@@ -152,17 +154,20 @@
   function startLevel(idx) {
     const L = LEVELS[idx];
     const terrain = makeTerrain(L.terr);
+    const freshLevel = !state || state.levelIdx !== idx;   // a retry keeps attempts; advancing/new resets
     state = Object.assign(state || {}, {
       levelIdx: idx, phase: "placing", terrain,
-      hunters: [], animals: [], queue: [],
+      hunters: [], runners: [], animals: [], queue: [],
       spawnTimer: 0, inv: { ...L.inv }, sel: state ? state.sel : "rock",
       meat: 0, acc: 0, last: 0, clock: 0, fx: [],
       hover: null, selHunter: null,
+      waveStats: {caught:0, meat:0, escaped:0, eaten:0, lost:0},
     });
     state.plan = buildRoster(L);   // telegraphed entry markers for this attempt
     state.launchTiles = computeLaunchTiles();
     if (idx===0 || !state.stats) state.stats = {caught:0, meat:0, huntersLost:0, preyLost:0, cleared:0};
-    log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs. Read the herd, then place.`);
+    if (freshLevel) state.attempts = MAX_ATTEMPTS;
+    log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs · ${state.attempts} attempt${state.attempts===1?"":"s"}. Read the herd, then place.`);
     renderUI();
   }
 
@@ -213,7 +218,8 @@
     // wandering the passable exterior forever without ever triggering termination.
     return { key, dir, exit:dir, x, y, rx:x, ry:y, hp, maxhp:hp, rate:A.step,
              alive:true, done:false, entered:true, flash:0, prog:0, age:0,
-             rootT:0, spawnT:0, fleeing:false, seed:Math.random()*Math.PI*2 };
+             rootT:0, spawnT:0, fleeing:false, seed:Math.random()*Math.PI*2,
+             hist:[], commit:0 };
   }
 
   function pickLane(span, axis) {
@@ -291,7 +297,22 @@
   function aiStep(a){
     const A = ANIMALS[a.key];
     const r = rectOf(a);
-    if (A.kind === "prey"){
+    // Loop-breaking: if the animal keeps revisiting the same cell, force it to
+    // commit to a run for the exit for a few steps (even if random / bad for it).
+    const cellKey = a.x+","+a.y;
+    a.hist.push(cellKey); if (a.hist.length>7) a.hist.shift();
+    if (a.commit>0) a.commit--;
+    else if (a.hist.filter(k=>k===cellKey).length>=3) a.commit = 6;
+    if (a.commit>0){
+      let best=null, bs=-1e9;
+      for (const [dx,dy] of DIRS){
+        const nr={x:r.x+dx,y:r.y+dy,w:r.w,h:r.h};
+        if (!canOccupy(nr, A.kind==="prey")) continue;
+        const s=(dx*a.exit.x+dy*a.exit.y)+Math.random()*0.8;   // toward exit, jittered
+        if (s>bs){ bs=s; best=[dx,dy]; }
+      }
+      if (best){ a.x+=best[0]; a.y+=best[1]; }
+    } else if (A.kind === "prey"){
       // Prey flee PREDATORS, not hunters — hunters are ambushers the prey walk into.
       // (Prey still won't step onto a hunter's cell; see canOccupy avoidHunters.)
       const threats = state.animals.filter(x=>x.alive && ANIMALS[x.key].kind==="predator").map(rectOf);
@@ -335,6 +356,7 @@
     const strayed = rr.x < -3 || rr.x > N+2 || rr.y < -3 || rr.y > N+2;
     if ((a.entered && fullyOutside(rr)) || strayed){
       a.done = true; a.alive = false;
+      if (A.kind==="prey" && state.waveStats) state.waveStats.escaped++;
       log(`… a ${A.label} slipped off the map.`);
     }
   }
@@ -376,14 +398,14 @@
       for (const p of state.animals){
         if (!p.alive || ANIMALS[p.key].kind!=="prey") continue;
         if (rectDist(r, rectOf(p)) <= 1 && Math.random() < A.attack){
-          p.alive = false; state.stats.preyLost++; sparks(acx(p), acy(p), "#b22", 9);
+          p.alive = false; state.stats.preyLost++; state.waveStats.eaten++; sparks(acx(p), acy(p), "#b22", 9);
           log(`🩸 A ${A.label} brought down a ${ANIMALS[p.key].label} — no meat for you.`);
         }
       }
       for (const hnt of state.hunters){
         if (hnt.dead || hunterHidden(hnt)) continue;      // can't kill what it can't see
         if (rectDist(r, {x:hnt.x,y:hnt.y,w:1,h:1}) <= 1 && Math.random() < A.attack){
-          hnt.dead = true; state.stats.huntersLost++; sparks(hcx(hnt), hcy(hnt), "#b22", 8); floatText(hcx(hnt), hcy(hnt)-6, "💀", "#e0574a");
+          hnt.dead = true; state.stats.huntersLost++; state.waveStats.lost++; sparks(hcx(hnt), hcy(hnt), "#b22", 8); floatText(hcx(hnt), hcy(hnt)-6, "💀", "#e0574a");
           log(`💀 A ${A.label} killed your ${WEAPONS[hnt.weapon].name} hunter!`);
         }
       }
@@ -392,6 +414,7 @@
       if (a.alive && a.hp <= 0){
         a.alive = false;
         const m = ANIMALS[a.key].meat; state.meat += m; state.stats.caught++; state.stats.meat += m;
+        state.waveStats.caught++; state.waveStats.meat += m;
         captureFx(acx(a), acy(a)); floatText(acx(a), acy(a)-10, "+"+m+" lbs", "#e6b959");
         log(`✅ Caught a ${ANIMALS[a.key].label} — +${m} lbs (${state.meat} total).`);
         renderMeat();
@@ -462,19 +485,29 @@
     while (state.acc >= TICK){ state.acc -= TICK; resolveCombat(); }
     for (const a of state.animals) if (a.flash>0) a.flash = Math.max(0, a.flash - dt*3);
 
-    if (state.queue.length===0 && state.animals.filter(a=>a.alive).length===0) endWave();
+    state.timeLeft -= dt;
+    const L = LEVELS[state.levelIdx];
+    const herdDone = state.queue.length===0 && state.animals.filter(a=>a.alive).length===0;
+    if (herdDone || state.timeLeft<=0 || state.waveStats.lost > L.maxLoss) endWave();
   }
 
   function endWave(){
     const L = LEVELS[state.levelIdx];
-    if (state.meat >= L.goal){
-      state.stats.cleared++;
-      if (state.levelIdx === LEVELS.length-1){ state.phase="won"; log(`🏆 The Great Hunt is complete. You are the tribe's finest hunter!`); renderUI(); }
-      else { log(`🎉 Level cleared! ${state.meat}/${L.goal} lbs. Advancing…`); startLevel(state.levelIdx + 1); }
-    } else {
-      log(`Only ${state.meat}/${L.goal} lbs — the herd got away. New ground, try again.`);
-      startLevel(state.levelIdx);
-    }
+    const tooMuchLoss = state.waveStats.lost > L.maxLoss;
+    const success = !tooMuchLoss && state.meat >= L.goal;
+    const lastLevel = state.levelIdx === LEVELS.length-1;
+    const reason = success ? "win" : tooMuchLoss ? "collateral" : (state.timeLeft<=0 ? "time" : "meat");
+    if (success) state.stats.cleared++; else state.attempts--;
+    state.result = Object.assign({ success, reason, meat:state.meat, goal:L.goal, maxLoss:L.maxLoss,
+      attemptsLeft:state.attempts, wonGame: success && lastLevel }, state.waveStats);
+    if (success && lastLevel){ state.phase="won"; log(`🏆 The Great Hunt is complete. You are the tribe's finest hunter!`); }
+    else if (!success && state.attempts<=0){ state.phase="gameover"; log(`The tribe goes hungry. Game over.`); }
+    else { state.phase="results";
+      log(success ? `🎉 Cleared — ${state.meat}/${L.goal} lbs.`
+        : reason==="collateral" ? `Lost ${state.waveStats.lost} hunters (max ${L.maxLoss}) — the hunt is a disaster.`
+        : reason==="time" ? `Time's up — only ${state.meat}/${L.goal} lbs.`
+        : `Only ${state.meat}/${L.goal} lbs — the herd got away.`); }
+    renderUI();
   }
 
   // ---- Terrain rendering (textured) -----------------------------------
@@ -616,11 +649,62 @@
     for (const h of state.hunters) drawHunterToken(h.x,h.y,h.weapon,hunterHidden(h));
     for (const a of state.animals) drawAnimal(a,dt);
     drawFx();
+    if (state.phase==="running") drawHUD();
     // vignette
     const vg=ctx.createRadialGradient(N*PX/2,N*PX/2,N*PX*0.3,N*PX/2,N*PX/2,N*PX*0.72);
     vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.34)");
     ctx.fillStyle=vg; ctx.fillRect(0,0,N*PX,N*PX);
     if (state.phase==="won") drawWin();
+    else if (state.phase==="results") drawResults();
+    else if (state.phase==="gameover") drawGameover();
+  }
+
+  function drawHUD(){
+    const W=N*PX, L=LEVELS[state.levelIdx], frac=Math.max(0,state.timeLeft/L.time);
+    ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(0,0,W,7);
+    ctx.fillStyle = frac<0.25 ? "#e0574a" : "#e6b959"; ctx.fillRect(0,0,W*frac,7);
+    ctx.textBaseline="top"; ctx.font="bold 13px ui-sans-serif,system-ui";
+    ctx.textAlign="left";  ctx.fillStyle="#efe6d4"; ctx.fillText(`⏱ ${Math.ceil(Math.max(0,state.timeLeft))}s`, 8, 13);
+    ctx.textAlign="center"; ctx.fillStyle="#e6b959"; ctx.fillText(`${state.meat} / ${L.goal} lbs`, W/2, 13);
+    ctx.textAlign="right"; ctx.fillStyle = state.waveStats.lost>=L.maxLoss ? "#e0574a" : "#cdbf9f";
+    ctx.fillText(`💀 ${state.waveStats.lost}/${L.maxLoss}`, W-8, 13);
+  }
+  function overlayStats(rows, y0){
+    ctx.font="15px ui-sans-serif,system-ui";
+    rows.forEach((r,i)=>{ const y=y0 + i*28;
+      ctx.textAlign="right"; ctx.fillStyle="#cdbf9f"; ctx.fillText(r[0], N*PX/2-12, y);
+      ctx.textAlign="left"; ctx.fillStyle="#efe6d4"; ctx.font="bold 15px ui-sans-serif,system-ui"; ctx.fillText(String(r[1]), N*PX/2+12, y);
+      ctx.font="15px ui-sans-serif,system-ui"; });
+    ctx.textAlign="center";
+  }
+  function drawResults(){
+    const W=N*PX, res=state.result;
+    ctx.fillStyle="rgba(10,8,4,.82)"; ctx.fillRect(0,0,W,W);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const titles = { win:"HUNT SUCCESSFUL", meat:"THE HERD GOT AWAY", time:"OUT OF TIME", collateral:"TOO MANY HUNTERS LOST" };
+    const icons  = { win:"🎉", meat:"🍂", time:"⏱", collateral:"💀" };
+    ctx.font="44px serif"; ctx.fillText(icons[res.reason], W/2, W*0.20);
+    ctx.font="bold 24px ui-sans-serif,system-ui"; ctx.fillStyle=res.success?"#8fd06a":"#e0a04c";
+    ctx.fillText(titles[res.reason], W/2, W*0.31);
+    ctx.font="16px ui-sans-serif,system-ui"; ctx.fillStyle="#efe6d4";
+    ctx.fillText(res.reason==="collateral" ? `${res.lost} hunters lost (max ${res.maxLoss})` : `${res.meat} / ${res.goal} lbs`, W/2, W*0.37);
+    overlayStats([["Caught",res.caught],["Escaped",res.escaped],["Eaten by predators",res.eaten],["Hunters lost",res.lost]], W*0.47);
+    ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
+    ctx.fillText(res.success ? "▶  Click to continue"
+      : `↻  Click to retry — ${res.attemptsLeft} attempt${res.attemptsLeft===1?"":"s"} left`, W/2, W*0.86);
+  }
+  function drawGameover(){
+    const W=N*PX, s=state.stats;
+    ctx.fillStyle="rgba(10,8,4,.86)"; ctx.fillRect(0,0,W,W);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="48px serif"; ctx.fillText("💀", W/2, W*0.22);
+    ctx.font="bold 25px ui-sans-serif,system-ui"; ctx.fillStyle="#e0574a";
+    ctx.fillText("THE TRIBE GOES HUNGRY", W/2, W*0.33);
+    ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#9b8f78";
+    ctx.fillText(`You fell at ${LEVELS[state.levelIdx].name} — level ${state.levelIdx+1}.`, W/2, W*0.39);
+    overlayStats([["Levels cleared",s.cleared],["Animals caught",s.caught],["Meat harvested",s.meat+" lbs"],["Hunters lost",s.huntersLost]], W*0.49);
+    ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
+    ctx.fillText("↻  Click to start over", W/2, W*0.86);
   }
 
   function drawWin(){
@@ -663,15 +747,20 @@
       el.innerHTML=`<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="rg">${W.role}</div><div class="ct">×${state.inv[k]}</div>`;
       el.onclick=()=>{ state.sel=k; state.selHunter=null; renderUI(); }; wrap.appendChild(el); }
     const start=document.getElementById("start");
-    start.disabled=state.phase==="running";
-    start.textContent=state.phase==="won"?"You Win 🏆":state.phase==="running"?"Hunting…":"Start Level ▶";
+    start.disabled=state.phase!=="placing";
+    start.textContent = state.phase==="won"?"You Win 🏆"
+      : state.phase==="gameover"?"Game Over"
+      : state.phase==="results"?(state.result&&state.result.success?"Cleared ✓":"Failed ✗")
+      : state.phase==="running"?"Hunting…":"Start Level ▶";
     document.getElementById("hint").textContent=defaultHint();
     document.getElementById("legend").innerHTML=Object.values(TERRAIN).map(t=>`<span><i style="background:${t.color}"></i>${t.name} ×${t.speed.toFixed(2)}</span>`).join("");
   }
   function defaultHint(){
     if (state.phase==="won") return "Press Restart to hunt again.";
+    if (state.phase==="gameover") return "Out of attempts — click the board to start over.";
+    if (state.phase==="results") return state.result && state.result.success ? "Click the board to continue." : "Click the board to retry this level.";
     if (state.phase==="running") return "The hunt is on — prey flee, predators close in.";
-    return "Ghosts show where the herd enters. Hover to preview range · click land to place · click a hunter to inspect, again to remove.";
+    return `${state.attempts} attempt${state.attempts===1?"":"s"} left. Ghosts show where the herd enters. Hover to preview range · click to place · click a hunter to remove.`;
   }
   function log(msg){ const el=document.getElementById("log"); const d=document.createElement("div"); d.textContent=msg;
     el.prepend(d); while (el.children.length>60) el.lastChild.remove(); }
@@ -688,13 +777,18 @@
     const c=cellAt(e); const i=state.hunters.findIndex(h=>h.x===c.x&&h.y===c.y);
     if(i>=0){ state.inv[state.hunters[i].weapon]++; state.hunters.splice(i,1); state.selHunter=null; renderUI(); } });
   canvas.addEventListener("pointerdown",(e)=>{
-    if (state.phase==="won"){ state=null; startLevel(0); return; }
+    if (state.phase==="won" || state.phase==="gameover"){ state=null; startLevel(0); return; }
+    if (state.phase==="results"){
+      if (state.result.success) startLevel(state.levelIdx + 1);   // advance (fresh attempts)
+      else startLevel(state.levelIdx);                            // retry (keeps decremented attempts)
+      return;
+    }
     if (state.phase!=="placing") return;
     const {x,y}=cellAt(e); if(!inBounds(x,y)) return;
     const hit=state.hunters.find(h=>h.x===x&&h.y===y);
     if (hit){
       if (state.selHunter===hit){ state.inv[hit.weapon]++; state.hunters.splice(state.hunters.indexOf(hit),1); state.selHunter=null; }
-      else { state.selHunter=hit; flashHint(`${WEAPONS[hit.weapon].name} · range ${WEAPONS[hit.weapon].range}${hunterHidden(hit)?" · hidden in forest":""}. Click again to remove.`); }
+      else { state.selHunter=hit; flashHint(`${WEAPONS[hit.weapon].name} · ${WEAPONS[hit.weapon].role}${hunterHidden(hit)?" · hidden in forest":""}. Click again to remove.`); }
       renderUI(); return;
     }
     state.selHunter=null;
@@ -707,8 +801,11 @@
   document.getElementById("start").onclick=()=>{
     if (state.phase!=="placing") return;
     if (state.hunters.length===0){ flashHint("Place at least one hunter first."); return; }
-    state.queue=state.plan; state.plan=[]; state.launchTiles=new Set(); state.phase="running"; state.selHunter=null; state.hover=null;
-    log(`The herd approaches — ${state.queue.length} animals.`); renderUI();
+    state.queue=state.plan; state.plan=[]; state.launchTiles=new Set();
+    state.waveStats={caught:0, meat:0, escaped:0, eaten:0, lost:0};
+    state.timeLeft=LEVELS[state.levelIdx].time;
+    state.phase="running"; state.selHunter=null; state.hover=null;
+    log(`The herd approaches — ${state.queue.length} animals · ${LEVELS[state.levelIdx].time}s.`); renderUI();
   };
   document.getElementById("reset").onclick=()=>{ state=null; startLevel(0); };
 
@@ -732,7 +829,8 @@
       for (let y=0;y<N && state.hunters.length<n;y++) for (let x=0;x<N && state.hunters.length<n;x++){
         if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y) && state.inv[weapon]>0){
           state.hunters.push({x,y,weapon}); state.inv[weapon]--; } } },
-    begin(){ state.queue = state.plan && state.plan.length ? state.plan : buildRoster(LEVELS[state.levelIdx]); state.plan=[]; state.launchTiles=new Set(); state.phase="running"; },
+    begin(){ state.queue = state.plan && state.plan.length ? state.plan : buildRoster(LEVELS[state.levelIdx]); state.plan=[]; state.launchTiles=new Set();
+      state.waveStats={caught:0,meat:0,escaped:0,eaten:0,lost:0}; state.timeLeft=LEVELS[state.levelIdx].time; state.phase="running"; },
     run(seconds=30, dt=1/30){ let t=0; while(t<seconds && state.phase==="running"){ step(dt); t+=dt; } return {phase:state.phase, meat:state.meat, level:state.levelIdx+1}; },
   };
 
