@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Mammoth Hunt</title>
+<style>
+  :root {
+    --bg: #14110d;
+    --panel: #1e1a14;
+    --ink: #efe6d4;
+    --muted: #9b8f78;
+    --line: #37301f;
+    --accent: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 20px; gap: 20px; flex-wrap: wrap;
+  }
+  h1 { font-size: 20px; margin: 0 0 2px; letter-spacing: .5px; }
+  .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  #stage { position: relative; }
+  canvas { background: #0e0c08; border: 1px solid var(--line); border-radius: 8px; image-rendering: pixelated; touch-action: none; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; width: 300px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .weapons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 10px 0; }
+  .wpn { background: #262015; border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; text-align: center; cursor: pointer; user-select: none; transition: .1s; }
+  .wpn.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .wpn .ico { font-size: 22px; }
+  .wpn .nm { font-size: 12px; margin-top: 2px; }
+  .wpn .ct { font-size: 12px; color: var(--muted); }
+  button { font: inherit; background: var(--accent); color: #1a1206; border: 0; border-radius: 8px; padding: 9px 12px; cursor: pointer; font-weight: 600; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: .4; cursor: default; }
+  .bar { height: 12px; background: #2a2416; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#b9722a,#d9a441); width: 0; transition: width .3s; }
+  .stat { display: flex; justify-content: space-between; font-size: 13px; margin: 6px 0; }
+  .stat b { color: var(--accent); }
+  #log { height: 150px; overflow-y: auto; font-size: 12px; color: var(--muted); background: #17130d; border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-top: 10px; }
+  #log div { margin-bottom: 3px; }
+  .legend { font-size: 11px; color: var(--muted); margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 32px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <h1>🦣 Mammoth Hunt</h1>
+    <p class="sub">Place your hunters. When the herd crosses, terrain and timing decide the kill.</p>
+    <canvas id="c" width="600" height="600"></canvas>
+  </div>
+
+  <div class="panel">
+    <div class="stat"><span>Wave</span><b id="wave">1</b></div>
+    <div class="stat"><span>Meat</span><span><b id="meat">0</b> / <span id="target">1000</span> lbs</span></div>
+    <div class="bar"><i id="meatbar"></i></div>
+
+    <div class="weapons" id="weapons"></div>
+
+    <div class="row" style="margin-top:4px">
+      <button id="start">Start Wave ▶</button>
+      <button id="reset" class="ghost">Reset</button>
+    </div>
+    <div class="hint" id="hint">Select a weapon, click land to place a hunter. Click a hunter to remove it.</div>
+
+    <div class="legend" id="legend"></div>
+    <div id="log"></div>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---- Config ----------------------------------------------------------
+  const N = 10;                 // grid cells per side
+  const PX = 60;                // pixels per cell (canvas = N*PX)
+  const TICK = 0.20;            // combat resolves every 0.20s of game time
+  const WIN = 1000;             // lbs of meat to win
+
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  // ---- Terrain ---------------------------------------------------------
+  // speed: multiplier on animal move speed while crossing the cell
+  // walkable: can a hunter stand here
+  // block: animals refuse to path through this cell at all
+  const TERRAIN = {
+    grass:    { name:"Grassland", color:"#3e5b2a", speed:1.00, walkable:true,  block:false },
+    forest:   { name:"Forest",    color:"#22401f", speed:0.60, walkable:true,  block:false },
+    marsh:    { name:"Marsh",     color:"#3a3d2b", speed:0.45, walkable:true,  block:false },
+    water:    { name:"Water",     color:"#1d3a4a", speed:0.35, walkable:false, block:false },
+    rock:     { name:"Rock",      color:"#4a4438", speed:1.00, walkable:false, block:true  },
+  };
+
+  // ---- Weapons ---------------------------------------------------------
+  const WEAPONS = {
+    rock: { name:"Rock",  ico:"🪨", dmg:5, color:"#9aa0a6" },
+    spear:{ name:"Spear", ico:"🔱", dmg:10, color:"#d9a441" },
+    net:  { name:"Net",   ico:"🕸️", dmg:2,  color:"#7fb0c9" }, // captures small prey + slows
+  };
+
+  // ---- Animals ---------------------------------------------------------
+  // hit: probability a given weapon lands per combat tick when in range
+  // size: [w,h] in cells. speed: cells/sec on grassland.
+  const ANIMALS = {
+    rabbit: { label:"Rabbit", emoji:"🐇", size:[1,1], hp:[4,6],   meat:3,   speed:3.2, kind:"prey",
+              hit:{rock:0.30, spear:0.20, net:0.65}, color:"#c8b89a" },
+    deer:   { label:"Deer",   emoji:"🦌", size:[2,1], hp:[12,16], meat:70,  speed:2.4, kind:"prey",
+              hit:{rock:0.45, spear:0.55, net:0.35}, color:"#b98a52" },
+    bison:  { label:"Bison",  emoji:"🐂", size:[3,2], hp:[40,52], meat:350, speed:1.3, kind:"prey",
+              hit:{rock:0.55, spear:0.70, net:0.15}, color:"#7a5a3a" },
+    mammoth:{ label:"Mammoth",emoji:"🦣", size:[6,2], hp:[70,90], meat:600, speed:1.0, kind:"prey",
+              hit:{rock:0.50, spear:0.75, net:0.10}, color:"#6b5540" },
+    wolf:   { label:"Wolf",   emoji:"🐺", size:[2,1], hp:[14,18], meat:25,  speed:2.8, kind:"predator",
+              attack:0.35, hit:{rock:0.40, spear:0.60, net:0.30}, color:"#8a8f96" },
+    bear:   { label:"Bear",   emoji:"🐻", size:[2,2], hp:[42,54], meat:220, speed:1.6, kind:"predator",
+              attack:0.45, hit:{rock:0.45, spear:0.65, net:0.20}, color:"#5a4632" },
+  };
+
+  // ---- Game state ------------------------------------------------------
+  let state;
+
+  function newInventory(wave) {
+    return { rock: 4 + wave, spear: 2 + Math.floor(wave/2), net: 2 + Math.floor(wave/2) };
+  }
+
+  function makeTerrain(wave) {
+    // deterministic-ish per wave using a small LCG seeded by wave
+    let seed = wave * 2654435761 % 2147483647;
+    const rnd = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+    const g = Array.from({length:N}, () => Array.from({length:N}, () => "grass"));
+    const scatter = (type, count, blob) => {
+      for (let k=0;k<count;k++){
+        const cx = Math.floor(rnd()*N), cy = Math.floor(rnd()*N);
+        const r = blob ? 1 + Math.floor(rnd()*2) : 0;
+        for (let y=cy-r;y<=cy+r;y++) for (let x=cx-r;x<=cx+r;x++){
+          if (x>=0&&x<N&&y>=0&&y<N && rnd()>0.25) g[y][x] = type;
+        }
+      }
+    };
+    scatter("forest", 2 + wave, true);
+    scatter("marsh", 1 + Math.floor(wave/2), true);
+    scatter("water", 1 + Math.floor(wave/2), true);
+    scatter("rock", 2, false);
+    return g;
+  }
+
+  function reset() {
+    state = {
+      wave: 1,
+      meat: 0,
+      phase: "placing",           // placing | running | over
+      terrain: makeTerrain(1),
+      hunters: [],                // {x,y,weapon}
+      animals: [],
+      inv: newInventory(1),
+      sel: "rock",
+      queue: [],                  // pending spawns
+      spawnTimer: 0,
+      acc: 0,
+      last: 0,
+    };
+    log("Wave 1 — place your hunters.");
+    renderUI();
+  }
+
+  // ---- Wave building ---------------------------------------------------
+  function buildWave(wave) {
+    const rng = () => Math.random();
+    const pool = [];
+    const add = (k, n) => { for (let i=0;i<n;i++) pool.push(k); };
+    add("rabbit", 3);
+    add("deer", 2 + wave);
+    if (wave >= 2) add("bison", wave);
+    if (wave >= 2) add("wolf", 1 + Math.floor(wave/2));
+    if (wave >= 3) add("bear", Math.floor(wave/2));
+    if (wave >= 3) add("mammoth", Math.max(1, wave - 2));
+    // shuffle
+    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    return pool.map(k => spawnFor(k));
+  }
+
+  // Choose an entry edge + lane that keeps the animal on valid (non-rock) cells
+  function spawnFor(key) {
+    const A = ANIMALS[key];
+    const [w,h] = A.size;
+    const horiz = Math.random() < 0.5;
+    let dir, x, y;
+    if (horiz) {
+      const fromLeft = Math.random() < 0.5;
+      dir = { x: fromLeft ? 1 : -1, y: 0 };
+      // pick a lane (top row) avoiding rock columns as much as possible
+      y = pickLane(h, "h");
+      x = fromLeft ? -w : N;
+    } else {
+      const fromTop = Math.random() < 0.5;
+      dir = { x: 0, y: fromTop ? 1 : -1 };
+      x = pickLane(w, "v");
+      y = fromTop ? -h : N;
+    }
+    const [lo,hi] = A.hp;
+    const hp = Math.round(lo + Math.random()*(hi-lo));
+    return { key, dir, x, y, hp, maxhp: hp, speed: A.speed, alive:true, done:false, flash:0 };
+  }
+
+  function pickLane(span, axis) {
+    // try lanes, prefer ones with fewest blocking rocks in the corridor
+    let best = 0, bestBlocks = Infinity;
+    for (let s=0; s<=N-span; s++){
+      let blocks = 0;
+      for (let i=0;i<N;i++) for (let j=0;j<span;j++){
+        const cx = axis==="h" ? i : s+j;
+        const cy = axis==="h" ? s+j : i;
+        if (TERRAIN[state.terrain[cy][cx]].block) blocks++;
+      }
+      if (blocks < bestBlocks || (blocks===bestBlocks && Math.random()<0.4)) { bestBlocks=blocks; best=s; }
+    }
+    return best;
+  }
+
+  // ---- Geometry helpers ------------------------------------------------
+  function cellsOf(a) {
+    const [w,h] = ANIMALS[a.key].size;
+    const ax = Math.round(a.x), ay = Math.round(a.y);
+    return { ax, ay, w, h };
+  }
+  function chebyshev(a, hx, hy) {
+    const {ax,ay,w,h} = cellsOf(a);
+    const dx = Math.max(ax - hx, hx - (ax + w - 1), 0);
+    const dy = Math.max(ay - hy, hy - (ay + h - 1), 0);
+    return Math.max(dx, dy);
+  }
+  function terrainSpeedAt(a) {
+    // sample the leading cell of the animal
+    const {ax,ay,w,h} = cellsOf(a);
+    const lx = a.dir.x > 0 ? ax + w - 1 : ax;
+    const ly = a.dir.y > 0 ? ay + h - 1 : ay;
+    const cx = Math.min(N-1, Math.max(0, lx));
+    const cy = Math.min(N-1, Math.max(0, ly));
+    return TERRAIN[state.terrain[cy][cx]].speed;
+  }
+
+  // ---- Combat ----------------------------------------------------------
+  function resolveCombat() {
+    for (const a of state.animals) {
+      if (!a.alive) continue;
+      const A = ANIMALS[a.key];
+      for (const hunter of state.hunters) {
+        if (hunter.dead) continue;
+        const d = chebyshev(a, hunter.x, hunter.y);
+        if (d > 1) continue;                        // must be adjacent or overlapping
+        const W = WEAPONS[hunter.weapon];
+        if (Math.random() < A.hit[hunter.weapon]) {
+          const area = A.size[0]*A.size[1];
+          if (hunter.weapon === "net" && area <= 2) {
+            a.hp = 0;                                 // net snares small prey outright
+            log(`🕸️ Net snared a ${A.label}!`);
+          } else {
+            a.hp -= W.dmg;
+            if (hunter.weapon === "net") a.speed *= 0.7; // net tangles bigger animals
+          }
+          a.flash = 1;
+        }
+        // predator retaliation: may overrun the hunter
+        if (A.kind === "predator" && d <= 1 && Math.random() < A.attack) {
+          hunter.dead = true;
+          log(`💀 A ${A.label} killed your ${W.name} hunter!`);
+        }
+      }
+      if (a.hp <= 0 && a.alive) {
+        a.alive = false;
+        state.meat += A.meat;
+        log(`✅ Caught a ${A.label} — +${A.meat} lbs (total ${state.meat}).`);
+      }
+    }
+    // clear the dead
+    state.hunters = state.hunters.filter(h => !h.dead);
+    state.animals = state.animals.filter(a => a.alive || a.flash > 0);
+  }
+
+  // ---- Main loop -------------------------------------------------------
+  function step(dt) {
+    if (state.phase !== "running") return;
+
+    // spawn from queue, staggered
+    state.spawnTimer -= dt;
+    if (state.queue.length && state.spawnTimer <= 0) {
+      state.animals.push(state.queue.shift());
+      state.spawnTimer = 0.9;
+    }
+
+    // move animals
+    for (const a of state.animals) {
+      if (!a.alive) continue;
+      const sp = a.speed * terrainSpeedAt(a);
+      a.x += a.dir.x * sp * dt;
+      a.y += a.dir.y * sp * dt;
+      const {ax,ay,w,h} = cellsOf(a);
+      if (ax > N || ay > N || ax + w < 0 || ay + h < 0) {
+        a.done = true; a.alive = false;
+        log(`… a ${ANIMALS[a.key].label} escaped off the map.`);
+      }
+    }
+    state.animals = state.animals.filter(a => (a.alive || a.flash>0) && !a.done);
+
+    // combat on fixed cadence
+    state.acc += dt;
+    while (state.acc >= TICK) { state.acc -= TICK; resolveCombat(); }
+
+    for (const a of state.animals) if (a.flash>0) a.flash = Math.max(0, a.flash - dt*3);
+
+    // win / wave-clear checks
+    if (state.meat >= WIN) { endGame(true); return; }
+    if (state.queue.length === 0 && state.animals.filter(a=>a.alive).length === 0) {
+      nextWave();
+    }
+  }
+
+  function nextWave() {
+    state.wave++;
+    state.phase = "placing";
+    state.terrain = makeTerrain(state.wave);
+    // re-validate hunter placements against new terrain
+    state.hunters = state.hunters.filter(h => TERRAIN[state.terrain[h.y][h.x]].walkable);
+    // grant fresh reinforcements
+    const inv = newInventory(state.wave);
+    state.inv = inv;
+    log(`— Wave ${state.wave} — new terrain, reinforcements arrive. Reposition and place.`);
+    renderUI();
+  }
+
+  function endGame(won) {
+    state.phase = "over";
+    log(won ? `🏆 You reached ${WIN} lbs of meat. The tribe feasts!`
+            : `Game over.`);
+    renderUI();
+  }
+
+  // ---- Rendering -------------------------------------------------------
+  function draw() {
+    // terrain
+    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
+      ctx.fillStyle = TERRAIN[state.terrain[y][x]].color;
+      ctx.fillRect(x*PX, y*PX, PX, PX);
+    }
+    // grid lines
+    ctx.strokeStyle = "rgba(0,0,0,.25)";
+    ctx.lineWidth = 1;
+    for (let i=0;i<=N;i++){
+      ctx.beginPath(); ctx.moveTo(i*PX,0); ctx.lineTo(i*PX,N*PX); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,i*PX); ctx.lineTo(N*PX,i*PX); ctx.stroke();
+    }
+    // hunters
+    for (const h of state.hunters){
+      const W = WEAPONS[h.weapon];
+      ctx.fillStyle = "rgba(0,0,0,.35)";
+      ctx.fillRect(h.x*PX+6, h.y*PX+6, PX-12, PX-12);
+      ctx.strokeStyle = W.color; ctx.lineWidth = 2;
+      ctx.strokeRect(h.x*PX+6, h.y*PX+6, PX-12, PX-12);
+      ctx.font = "26px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(W.ico, h.x*PX+PX/2, h.y*PX+PX/2+2);
+    }
+    // animals
+    for (const a of state.animals){
+      const A = ANIMALS[a.key];
+      const {ax,ay,w,h} = cellsOf(a);
+      const px = a.x*PX, py = a.y*PX, pw = w*PX, ph = h*PX;
+      ctx.fillStyle = a.flash>0 ? "#e86a4c" : A.color;
+      ctx.globalAlpha = a.alive ? 1 : 0.4;
+      roundRect(px+3, py+3, pw-6, ph-6, 8); ctx.fill();
+      ctx.globalAlpha = 1;
+      // emoji + hp bar
+      ctx.font = Math.min(ph-10, 34) + "px serif";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText(A.emoji, px+pw/2, py+ph/2);
+      if (a.alive){
+        const bw = pw-10, frac = Math.max(0, a.hp/a.maxhp);
+        ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(px+5, py+ph-9, bw, 4);
+        ctx.fillStyle = A.kind==="predator" ? "#e0574a" : "#8fd06a";
+        ctx.fillRect(px+5, py+ph-9, bw*frac, 4);
+      }
+    }
+  }
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // ---- UI --------------------------------------------------------------
+  function renderUI() {
+    document.getElementById("wave").textContent = state.wave;
+    document.getElementById("meat").textContent = state.meat;
+    document.getElementById("target").textContent = WIN;
+    document.getElementById("meatbar").style.width = Math.min(100, state.meat/WIN*100) + "%";
+
+    const wrap = document.getElementById("weapons");
+    wrap.innerHTML = "";
+    for (const k of Object.keys(WEAPONS)){
+      const W = WEAPONS[k];
+      const el = document.createElement("div");
+      el.className = "wpn" + (state.sel===k ? " sel":"");
+      el.innerHTML = `<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="ct">×${state.inv[k]}</div>`;
+      el.onclick = () => { state.sel = k; renderUI(); };
+      wrap.appendChild(el);
+    }
+    const start = document.getElementById("start");
+    start.disabled = state.phase === "running";
+    start.textContent = state.phase === "over" ? "Play Again ▶"
+                       : state.phase === "running" ? "Hunting…" : "Start Wave ▶";
+
+    // legend
+    const lg = document.getElementById("legend");
+    lg.innerHTML = Object.values(TERRAIN).map(t =>
+      `<span><i style="background:${t.color}"></i>${t.name} ×${t.speed.toFixed(2)}</span>`).join("");
+  }
+
+  function log(msg){
+    const el = document.getElementById("log");
+    const d = document.createElement("div"); d.textContent = msg;
+    el.prepend(d);
+    while (el.children.length > 60) el.lastChild.remove();
+  }
+
+  // ---- Input -----------------------------------------------------------
+  canvas.addEventListener("pointerdown", (e) => {
+    if (state.phase === "running") return;
+    const r = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) / r.width * N);
+    const y = Math.floor((e.clientY - r.top) / r.height * N);
+    if (x<0||x>=N||y<0||y>=N) return;
+    // remove hunter if clicking one
+    const idx = state.hunters.findIndex(h => h.x===x && h.y===y);
+    if (idx >= 0){
+      state.inv[state.hunters[idx].weapon]++;
+      state.hunters.splice(idx,1);
+      renderUI(); return;
+    }
+    // place
+    if (!TERRAIN[state.terrain[y][x]].walkable){ flashHint("Can't stand on that terrain."); return; }
+    if (state.inv[state.sel] <= 0){ flashHint("No "+WEAPONS[state.sel].name+" hunters left."); return; }
+    state.hunters.push({ x, y, weapon: state.sel });
+    state.inv[state.sel]--;
+    renderUI();
+  });
+
+  let hintTimer;
+  function flashHint(t){
+    const h = document.getElementById("hint");
+    h.textContent = t; clearTimeout(hintTimer);
+    hintTimer = setTimeout(()=> h.textContent = defaultHint(), 1800);
+  }
+  function defaultHint(){
+    return state.phase==="running" ? "The hunt is on — watch the herd cross."
+      : "Select a weapon, click land to place a hunter. Click a hunter to remove it.";
+  }
+
+  document.getElementById("start").onclick = () => {
+    if (state.phase === "over"){ reset(); return; }
+    if (state.phase !== "placing") return;
+    if (state.hunters.length === 0){ flashHint("Place at least one hunter first."); return; }
+    state.queue = buildWave(state.wave);
+    state.phase = "running";
+    log(`Wave ${state.wave} incoming — ${state.queue.length} animals.`);
+    document.getElementById("hint").textContent = defaultHint();
+    renderUI();
+  };
+  document.getElementById("reset").onclick = reset;
+
+  // ---- Boot ------------------------------------------------------------
+  function frame(t){
+    if (!state.last) state.last = t;
+    const dt = Math.min(0.05, (t - state.last)/1000);
+    state.last = t;
+    step(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
