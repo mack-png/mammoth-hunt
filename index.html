@@ -68,8 +68,7 @@
     <div class="hint" id="hint"></div>
 
     <div class="tips">
-      <b>🌲 Forest</b> hides hunters (predators can't target them) &amp; sharpens aim.
-      <b>🕸️ Net</b> roots big game so spears pile on. <b>🪨 Rock</b> strikes from 2 tiles — safe but weak.
+      <b>🔱 Spear</b> hits the 8 adjacent tiles, heavy. <b>🪨 Rock</b> throws 2 tiles straight (↑↓←→). <b>🕸️ Net</b> deals no damage — it snares small prey &amp; roots big game so spears finish. <b>🌲 Forest</b> hides hunters. <b style="color:#e0574a">Red</b> tiles are entry points; your range can't cover them.
     </div>
     <div class="legend" id="legend"></div>
     <div id="log"></div>
@@ -97,9 +96,14 @@
 
   // ---- Weapons (distinct ranges + roles) ------------------------------
   const WEAPONS = {
-    rock: { name:"Rock",  ico:"🪨", dmg:4,  range:2, color:"#b9c0c7", role:"safe chip" },
-    spear:{ name:"Spear", ico:"🔱", dmg:11, range:1, color:"#e6b959", role:"heavy, exposed" },
-    net:  { name:"Net",   ico:"🕸️", dmg:2,  range:1, color:"#8fc7e0", role:"snare & root" },
+    rock: { name:"Rock",  ico:"🪨", dmg:4,  shape:"cross",  color:"#b9c0c7", role:"2 straight" },
+    spear:{ name:"Spear", ico:"🔱", dmg:11, shape:"square", color:"#e6b959", role:"adjacent" },
+    net:  { name:"Net",   ico:"🕸️", dmg:0,  shape:"square", color:"#8fc7e0", role:"snare/root" },
+  };
+  // range footprints (offsets from the hunter cell)
+  const OFFSETS = {
+    square: [[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1]],           // 8 adjacent + self
+    cross:  [[0,0],[1,0],[2,0],[-1,0],[-2,0],[0,1],[0,2],[0,-1],[0,-2]],             // 2 tiles straight
   };
 
   // ---- Animals ---------------------------------------------------------
@@ -156,6 +160,7 @@
       hover: null, selHunter: null,
     });
     state.plan = buildRoster(L);   // telegraphed entry markers for this attempt
+    state.launchTiles = computeLaunchTiles();
     if (idx===0 || !state.stats) state.stats = {caught:0, meat:0, huntersLost:0, preyLost:0, cleared:0};
     log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs. Read the herd, then place.`);
     renderUI();
@@ -235,6 +240,35 @@
   function anyInside(r){ return !fullyOutside(r); }
   function inBounds(x,y){ return x>=0&&x<N&&y>=0&&y<N; }
   function hunterHidden(h){ return state.terrain[h.y][h.x] === "forest"; }
+
+  // ---- Weapon range / placement rules ---------------------------------
+  function weaponOffsets(weapon){ return OFFSETS[WEAPONS[weapon].shape]; }
+  function forWeaponCells(hx,hy,weapon,cb){
+    for (const [dx,dy] of weaponOffsets(weapon)){ const x=hx+dx, y=hy+dy; if (inBounds(x,y)) cb(x,y); }
+  }
+  // does this hunter's weapon reach any cell of the animal footprint?
+  function reaches(weapon,hx,hy,rect){
+    const gapX = Math.max(rect.x-hx, hx-(rect.x+rect.w-1), 0);
+    const gapY = Math.max(rect.y-hy, hy-(rect.y+rect.h-1), 0);
+    if (WEAPONS[weapon].shape==="cross") return (gapX===0 && gapY<=2) || (gapY===0 && gapX<=2);
+    return Math.max(gapX,gapY) <= 1;
+  }
+  function computeLaunchTiles(){
+    const set=new Set();
+    for (const s of state.plan){ const [w,h]=ANIMALS[s.key].size;
+      for (let y=s.y;y<s.y+h;y++) for (let x=s.x;x<s.x+w;x++) if (inBounds(x,y)) set.add(y*N+x); }
+    return set;
+  }
+  function coversLaunch(x,y,weapon){
+    for (const [dx,dy] of weaponOffsets(weapon)){ const cx=x+dx, cy=y+dy;
+      if (inBounds(cx,cy) && state.launchTiles.has(cy*N+cx)) return true; }
+    return false;
+  }
+  function placementError(x,y,weapon){
+    if (!TERRAIN[state.terrain[y][x]].walkable) return "Can't stand on water or rock.";
+    if (coversLaunch(x,y,weapon)) return "Range can't cover an animal's entry tile.";
+    return null;
+  }
   function terrainSpeedAt(a){
     const r = rectOf(a);
     const lx = Math.min(N-1, Math.max(0, a.dir.x>0 ? r.x+r.w-1 : r.x));
@@ -320,16 +354,14 @@
       for (const a of state.animals){
         if (!a.alive) continue;
         const A = ANIMALS[a.key];
-        if (rectDist(rectOf(a), {x:hnt.x,y:hnt.y,w:1,h:1}) > W.range) continue;
+        if (!reaches(hnt.weapon, hnt.x, hnt.y, rectOf(a))) continue;
         const chance = Math.min(0.95, A.hit[hnt.weapon] + (hidden?0.12:0));
         if (Math.random() < chance){
           addFx({type:"proj", wpn:hnt.weapon, x0:hcx(hnt), y0:hcy(hnt), x1:acx(a), y1:acy(a), life:0.16});
           const area = A.size[0]*A.size[1];
-          if (hnt.weapon==="net" && A.kind==="prey" && area<=2){
-            a.hp = 0; netFx(acx(a), acy(a), "#8fc7e0"); log(`🕸️ Net snared a ${A.label}!`);
-          } else if (hnt.weapon==="net"){
-            a.hp -= W.dmg; a.rootT = Math.min(2.0, a.rootT + 1.2);
-            netFx(acx(a), acy(a), "#8fc7e0"); floatText(acx(a), acy(a)-8, "rooted", "#8fc7e0");
+          if (hnt.weapon==="net"){
+            if (A.kind==="prey" && area<=2){ a.hp = 0; netFx(acx(a), acy(a), "#8fc7e0"); log(`🕸️ Net snared a ${A.label}!`); }
+            else { a.rootT = Math.min(2.0, a.rootT + 1.2); netFx(acx(a), acy(a), "#8fc7e0"); floatText(acx(a), acy(a)-8, "rooted", "#8fc7e0"); }
           } else {
             a.hp -= W.dmg; sparks(acx(a), acy(a), W.color, 5);
           }
@@ -453,81 +485,83 @@
     r=Math.max(0,Math.min(255,r+f)); g=Math.max(0,Math.min(255,g+f)); b=Math.max(0,Math.min(255,b+f));
     return `rgb(${r|0},${g|0},${b|0})`; }
 
+  // Terrain reads by TYPE, not by decorative noise: flat calm ground, one clear
+  // motif per special tile, and a blocked-edge cue on non-walkable tiles.
   function drawCell(x,y){
-    const type = state.terrain[y][x], T = TERRAIN[type], rnd = rngFor(x,y);
-    const ox=x*PX, oy=y*PX;
+    const type = state.terrain[y][x], T = TERRAIN[type], ox=x*PX, oy=y*PX;
     ctx.fillStyle = T.color; ctx.fillRect(ox,oy,PX,PX);
-    // subtle per-cell tone variation
-    ctx.globalAlpha = 0.10; ctx.fillStyle = rnd()>0.5 ? "#fff":"#000"; ctx.fillRect(ox,oy,PX,PX); ctx.globalAlpha=1;
-    if (type==="grass"){
-      ctx.strokeStyle = shade("#40602a",-22); ctx.lineWidth=1.4;
-      for (let i=0;i<3;i++){ const gx=ox+6+rnd()*(PX-12), gy=oy+10+rnd()*(PX-14);
-        ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx-2,gy-5); ctx.moveTo(gx,gy); ctx.lineTo(gx+2,gy-5); ctx.stroke(); }
-    } else if (type==="forest"){
-      for (let i=0;i<2;i++){ const tx=ox+PX*(0.3+0.4*rnd()), ty=oy+PX*(0.35+0.4*rnd()), rr=PX*0.24;
-        ctx.fillStyle="#3a2317"; ctx.fillRect(tx-2, ty, 4, PX*0.22);
-        ctx.fillStyle=shade("#2f5324", (rnd()*30-10)|0); ctx.beginPath(); ctx.arc(tx,ty,rr,0,7); ctx.fill();
-        ctx.fillStyle="rgba(255,255,255,.08)"; ctx.beginPath(); ctx.arc(tx-rr*0.3,ty-rr*0.3,rr*0.5,0,7); ctx.fill(); }
+    if (type==="forest"){
+      // clear tree canopies — signal "slows animals, hides hunters"
+      const spots=[[0.34,0.4,0.26],[0.66,0.6,0.22]];
+      for (const [fx,fy,fr] of spots){ const tx=ox+PX*fx, ty=oy+PX*fy, rr=PX*fr;
+        ctx.fillStyle="#3a2317"; ctx.fillRect(tx-2, ty, 4, PX*0.2);
+        ctx.fillStyle="#2f5324"; ctx.beginPath(); ctx.arc(tx,ty,rr,0,7); ctx.fill();
+        ctx.fillStyle="rgba(255,255,255,.06)"; ctx.beginPath(); ctx.arc(tx-rr*0.3,ty-rr*0.3,rr*0.5,0,7); ctx.fill(); }
     } else if (type==="marsh"){
-      ctx.fillStyle="rgba(30,40,25,.5)";
-      for (let i=0;i<3;i++){ ctx.beginPath(); ctx.ellipse(ox+PX*rnd(), oy+PX*(0.3+0.5*rnd()), PX*0.22, PX*0.09, 0,0,7); ctx.fill(); }
-      ctx.strokeStyle="#5c6b32"; ctx.lineWidth=1.3;
-      for (let i=0;i<2;i++){ const rx2=ox+8+rnd()*(PX-16); ctx.beginPath(); ctx.moveTo(rx2,oy+PX-6); ctx.lineTo(rx2+ (rnd()*4-2), oy+PX-16); ctx.stroke(); }
+      // muddy pool — distinct from water, clearly walkable-but-slow
+      ctx.fillStyle="rgba(26,34,20,.35)"; ctx.beginPath(); ctx.ellipse(ox+PX*0.5, oy+PX*0.56, PX*0.32, PX*0.17, 0,0,7); ctx.fill();
+      ctx.strokeStyle="rgba(120,140,70,.45)"; ctx.lineWidth=1.4;
+      ctx.beginPath(); ctx.moveTo(ox+PX*0.5, oy+PX-7); ctx.lineTo(ox+PX*0.5, oy+PX-17); ctx.stroke();
     } else if (type==="water"){
-      const sh = Math.sin(state.clock*1.5 + x*0.7 + y*0.5);
-      ctx.strokeStyle="rgba(150,200,220,.28)"; ctx.lineWidth=1.4;
-      for (let i=0;i<2;i++){ const wy=oy+PX*(0.35+0.3*i)+sh*2; ctx.beginPath();
-        ctx.moveTo(ox+6, wy); ctx.quadraticCurveTo(ox+PX/2, wy+3, ox+PX-6, wy); ctx.stroke(); }
+      const sh = Math.sin(state.clock*1.4 + x*0.6 + y*0.5);
+      ctx.strokeStyle="rgba(150,200,220,.26)"; ctx.lineWidth=1.4;
+      for (let i=0;i<2;i++){ const wy=oy+PX*(0.4+0.28*i)+sh*2; ctx.beginPath();
+        ctx.moveTo(ox+7, wy); ctx.quadraticCurveTo(ox+PX/2, wy+3, ox+PX-7, wy); ctx.stroke(); }
     } else if (type==="rock"){
-      for (let i=0;i<2;i++){ const bx=ox+PX*(0.28+0.44*rnd()), by=oy+PX*(0.4+0.35*rnd()), rr=PX*(0.18+0.1*rnd());
-        ctx.fillStyle=shade("#5a5347",(rnd()*20-10)|0); ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fill();
-        ctx.fillStyle="rgba(255,255,255,.12)"; ctx.beginPath(); ctx.arc(bx-rr*0.3,by-rr*0.35,rr*0.45,0,7); ctx.fill();
-        ctx.fillStyle="rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(bx,by+rr*0.8,rr,rr*0.3,0,0,7); ctx.fill(); }
+      const bx=ox+PX*0.5, by=oy+PX*0.52, rr=PX*0.3;
+      ctx.fillStyle="rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(bx,by+rr*0.7,rr,rr*0.28,0,0,7); ctx.fill();
+      ctx.fillStyle="#5a5347"; ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fill();
+      ctx.fillStyle="rgba(255,255,255,.12)"; ctx.beginPath(); ctx.arc(bx-rr*0.3,by-rr*0.35,rr*0.45,0,7); ctx.fill();
     }
+    // non-walkable tiles get an inset border so "you can't stand here" reads at a glance
+    if (!T.walkable){ ctx.strokeStyle="rgba(0,0,0,.28)"; ctx.lineWidth=2; ctx.strokeRect(ox+1.5,oy+1.5,PX-3,PX-3); }
   }
 
-  // ---- Range / coverage helpers ---------------------------------------
-  function forRange(hx,hy,rng,cb){ for (let dy=-rng;dy<=rng;dy++) for (let dx=-rng;dx<=rng;dx++){ const x=hx+dx,y=hy+dy; if(inBounds(x,y)) cb(x,y); } }
-
   function drawPlacingOverlay(){
-    // coverage heat-tint of every placed hunter's range
+    // coverage heat-tint of every placed hunter's reach
     const cov = Array.from({length:N},()=>new Array(N).fill(0));
-    for (const h of state.hunters) forRange(h.x,h.y,WEAPONS[h.weapon].range,(x,y)=>cov[y][x]++);
+    for (const h of state.hunters) forWeaponCells(h.x,h.y,h.weapon,(x,y)=>cov[y][x]++);
     for (let y=0;y<N;y++) for (let x=0;x<N;x++) if (cov[y][x]>0){
-      ctx.fillStyle = `rgba(224,172,76,${Math.min(0.30, 0.05*cov[y][x]+0.05)})`;
+      ctx.fillStyle = `rgba(224,172,76,${Math.min(0.28, 0.05*cov[y][x]+0.05)})`;
       ctx.fillRect(x*PX,y*PX,PX,PX);
     }
-    // telegraph: where the herd enters + which way it crosses
+    // entry tiles — animals appear here; your range may not cover them
+    for (const key of state.launchTiles){ const x=key%N, y=(key-x)/N;
+      ctx.fillStyle="rgba(224,87,74,.15)"; ctx.fillRect(x*PX,y*PX,PX,PX);
+      ctx.strokeStyle="rgba(224,87,74,.5)"; ctx.lineWidth=1.5; ctx.strokeRect(x*PX+2,y*PX+2,PX-4,PX-4);
+    }
+    // telegraph: which animal enters where, and its heading
     for (const s of state.plan){
       const A = ANIMALS[s.key];
       const ex = Math.min(N-1,Math.max(0, s.dir.x>0? 0 : s.dir.x<0? N-1 : s.x));
       const ey = Math.min(N-1,Math.max(0, s.dir.y>0? 0 : s.dir.y<0? N-1 : s.y));
       const mx=(ex+0.5)*PX, my=(ey+0.5)*PX;
-      ctx.globalAlpha=0.5; ctx.font="18px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.globalAlpha=0.65; ctx.font="17px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(A.emoji, mx, my);
-      // arrow in travel direction
-      ctx.strokeStyle=ANIMALS[s.key].kind==="predator"?"#e0574a":"#e6d38a"; ctx.lineWidth=2; ctx.globalAlpha=0.55;
-      ctx.beginPath(); ctx.moveTo(mx+s.dir.x*10, my+s.dir.y*10); ctx.lineTo(mx+s.dir.x*20, my+s.dir.y*20); ctx.stroke();
+      ctx.strokeStyle=A.kind==="predator"?"#e0574a":"#e6d38a"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(mx+s.dir.x*11, my+s.dir.y*11); ctx.lineTo(mx+s.dir.x*20, my+s.dir.y*20); ctx.stroke();
       ctx.globalAlpha=1;
     }
-    // hover preview
+    // hover preview (green-ish = ok, red = blocked)
     const hv = state.hover;
     if (hv){
       const onHunter = state.hunters.find(h=>h.x===hv.x&&h.y===hv.y);
-      if (onHunter){ outlineRange(onHunter.x,onHunter.y,WEAPONS[onHunter.weapon].range, WEAPONS[onHunter.weapon].color); }
-      else if (TERRAIN[state.terrain[hv.y][hv.x]].walkable && state.inv[state.sel]>0){
-        outlineRange(hv.x,hv.y,WEAPONS[state.sel].range, WEAPONS[state.sel].color);
-        ctx.globalAlpha=0.5; drawHunterToken(hv.x,hv.y,state.sel,false); ctx.globalAlpha=1;
+      if (onHunter){ outlineWeapon(onHunter.x,onHunter.y,onHunter.weapon, WEAPONS[onHunter.weapon].color); }
+      else if (state.inv[state.sel]>0){
+        const err = placementError(hv.x,hv.y,state.sel);
+        outlineWeapon(hv.x,hv.y,state.sel, err ? "#e0574a" : WEAPONS[state.sel].color);
+        if (!err){ ctx.globalAlpha=0.5; drawHunterToken(hv.x,hv.y,state.sel,false); ctx.globalAlpha=1; }
       }
     }
     if (state.selHunter && state.hunters.includes(state.selHunter)){
-      const s=state.selHunter; outlineRange(s.x,s.y,WEAPONS[s.weapon].range,"#fff");
+      const s=state.selHunter; outlineWeapon(s.x,s.y,s.weapon,"#fff");
     }
   }
-  function outlineRange(hx,hy,rng,color){
-    forRange(hx,hy,rng,(x,y)=>{ ctx.fillStyle=`rgba(255,255,255,.10)`; ctx.fillRect(x*PX,y*PX,PX,PX); });
-    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.globalAlpha=0.9;
-    ctx.strokeRect((hx-rng)*PX+1,(hy-rng)*PX+1,(2*rng+1)*PX-2,(2*rng+1)*PX-2); ctx.globalAlpha=1;
+  function outlineWeapon(hx,hy,weapon,color){
+    forWeaponCells(hx,hy,weapon,(x,y)=>{
+      ctx.fillStyle="rgba(255,255,255,.09)"; ctx.fillRect(x*PX,y*PX,PX,PX);
+      ctx.strokeStyle=color; ctx.globalAlpha=0.85; ctx.lineWidth=1.5; ctx.strokeRect(x*PX+1.5,y*PX+1.5,PX-3,PX-3); ctx.globalAlpha=1;
+    });
   }
 
   // ---- Tokens ----------------------------------------------------------
@@ -627,7 +661,7 @@
     const wrap=document.getElementById("weapons"); wrap.innerHTML="";
     for (const k in WEAPONS){ const W=WEAPONS[k]; const el=document.createElement("div");
       el.className="wpn"+(state.sel===k?" sel":"");
-      el.innerHTML=`<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="rg">rng ${W.range} · ${W.role}</div><div class="ct">×${state.inv[k]}</div>`;
+      el.innerHTML=`<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="rg">${W.role}</div><div class="ct">×${state.inv[k]}</div>`;
       el.onclick=()=>{ state.sel=k; state.selHunter=null; renderUI(); }; wrap.appendChild(el); }
     const start=document.getElementById("start");
     start.disabled=state.phase==="running";
@@ -665,15 +699,16 @@
       renderUI(); return;
     }
     state.selHunter=null;
-    if (!TERRAIN[state.terrain[y][x]].walkable){ flashHint("Can't stand on water or rock."); return; }
     if (state.inv[state.sel]<=0){ flashHint("No "+WEAPONS[state.sel].name+" hunters left."); return; }
+    const err = placementError(x,y,state.sel);
+    if (err){ flashHint(err); return; }
     state.hunters.push({x,y,weapon:state.sel}); state.inv[state.sel]--; renderUI();
   });
 
   document.getElementById("start").onclick=()=>{
     if (state.phase!=="placing") return;
     if (state.hunters.length===0){ flashHint("Place at least one hunter first."); return; }
-    state.queue=state.plan; state.plan=[]; state.phase="running"; state.selHunter=null; state.hover=null;
+    state.queue=state.plan; state.plan=[]; state.launchTiles=new Set(); state.phase="running"; state.selHunter=null; state.hover=null;
     log(`The herd approaches — ${state.queue.length} animals.`); renderUI();
   };
   document.getElementById("reset").onclick=()=>{ state=null; startLevel(0); };
@@ -693,11 +728,12 @@
   window.__mh = {
     get state(){ return state; },
     step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS, WEAPONS,
+    coversLaunch, weaponOffsets, placementError,
     autoPlace(n=6, weapon="rock"){ state.sel=weapon;
       for (let y=0;y<N && state.hunters.length<n;y++) for (let x=0;x<N && state.hunters.length<n;x++){
         if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y) && state.inv[weapon]>0){
           state.hunters.push({x,y,weapon}); state.inv[weapon]--; } } },
-    begin(){ state.queue = state.plan && state.plan.length ? state.plan : buildRoster(LEVELS[state.levelIdx]); state.plan=[]; state.phase="running"; },
+    begin(){ state.queue = state.plan && state.plan.length ? state.plan : buildRoster(LEVELS[state.levelIdx]); state.plan=[]; state.launchTiles=new Set(); state.phase="running"; },
     run(seconds=30, dt=1/30){ let t=0; while(t<seconds && state.phase==="running"){ step(dt); t+=dt; } return {phase:state.phase, meat:state.meat, level:state.levelIdx+1}; },
   };
 
