@@ -1049,47 +1049,54 @@
   function overlayStats(rows, y0){
     ctx.font="15px ui-sans-serif,system-ui";
     rows.forEach((r,i)=>{ const y=y0 + i*28;
-      ctx.textAlign="right"; ctx.fillStyle="#cdbf9f"; ctx.fillText(r[0], N*PX/2-12, y);
-      ctx.textAlign="left"; ctx.fillStyle="#efe6d4"; ctx.font="bold 15px ui-sans-serif,system-ui"; ctx.fillText(String(r[1]), N*PX/2+12, y);
+      ctx.textAlign="right"; ctx.fillStyle="#9aa4b4"; ctx.fillText(r[0], N*PX/2-12, y);
+      ctx.textAlign="left"; ctx.fillStyle="#e8ecf3"; ctx.font="bold 15px ui-sans-serif,system-ui"; ctx.fillText(String(r[1]), N*PX/2+12, y);
       ctx.font="15px ui-sans-serif,system-ui"; });
     ctx.textAlign="center";
   }
+  // Firelight motif: a WARM hearth glow when you feed the tribe (success), a COLD one when
+  // the fire goes unfed (failure). Centred on the headline so it reads as intentional.
+  function scrim(a){ const W=N*PX; ctx.fillStyle=`rgba(9,11,17,${a})`; ctx.fillRect(0,0,W,W); }
+  function hearthGlow(warm){ const W=N*PX, cx=W/2, cy=W*0.26, g=ctx.createRadialGradient(cx,cy,0,cx,cy,W*0.55);
+    if (warm){ g.addColorStop(0,"rgba(235,155,64,.34)"); g.addColorStop(.42,"rgba(202,92,42,.13)"); g.addColorStop(1,"rgba(235,155,64,0)"); }
+    else     { g.addColorStop(0,"rgba(96,134,186,.20)"); g.addColorStop(.5,"rgba(60,90,140,.08)"); g.addColorStop(1,"rgba(96,134,186,0)"); }
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,W); }
   function drawResults(){
-    const W=N*PX, res=state.result;
-    ctx.fillStyle="rgba(10,8,4,.82)"; ctx.fillRect(0,0,W,W);
+    const W=N*PX, res=state.result, ok=res.success;
+    scrim(.86); hearthGlow(ok);
     ctx.textAlign="center"; ctx.textBaseline="middle";
-    if (res.success){
+    if (ok){
       ctx.font="60px serif"; ctx.fillText(MEDAL_ICON[res.medal], W/2, W*0.21);
-      ctx.font="bold 24px ui-sans-serif,system-ui"; ctx.fillStyle="#e6b959";
+      ctx.font="bold 24px ui-sans-serif,system-ui"; ctx.fillStyle="#f0b95e";
       ctx.fillText(MEDAL_NAME[res.medal].toUpperCase()+" — HUNT SUCCESSFUL", W/2, W*0.33);
-      ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#9b8f78";
+      ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#d9c39a";
       const nextTxt = res.medal<3 ? `Next: ${MEDAL_ICON[res.medal+1]} at ${res.th[["","bronze","silver","gold"][res.medal+1]]} lbs` : "Perfect — top medal!";
       ctx.fillText(`${res.meat} lbs bagged · ${nextTxt}`, W/2, W*0.39);
     } else {
       const titles={ meat:"THE HERD GOT AWAY", time:"OUT OF TIME", collateral:"TOO MANY HUNTERS LOST" };
       const icons={ meat:"🍂", time:"⏱", collateral:"💀" };
       ctx.font="44px serif"; ctx.fillText(icons[res.reason], W/2, W*0.21);
-      ctx.font="bold 24px ui-sans-serif,system-ui"; ctx.fillStyle="#e0a04c";
+      ctx.font="bold 24px ui-sans-serif,system-ui"; ctx.fillStyle="#aab6c8";
       ctx.fillText(titles[res.reason], W/2, W*0.33);
-      ctx.font="16px ui-sans-serif,system-ui"; ctx.fillStyle="#efe6d4";
+      ctx.font="16px ui-sans-serif,system-ui"; ctx.fillStyle="#c2cad6";
       ctx.fillText(res.reason==="collateral" ? `${res.lost} hunters lost (max ${res.maxLoss})` : `${res.meat} lbs · need ${res.th.bronze} for 🥉`, W/2, W*0.39);
     }
     overlayStats([["Caught",res.caught],["Escaped",res.escaped],["Eaten by predators",res.eaten],["Hunters lost",res.lost]], W*0.49);
-    ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
-    ctx.fillText(res.success ? "▶  Click to continue"
+    ctx.fillStyle=ok?"#f0b95e":"#c2cad6"; ctx.font="bold 15px ui-sans-serif,system-ui";
+    ctx.fillText(ok ? "▶  Click to continue"
       : `↻  Click to retry — ${res.attemptsLeft} attempt${res.attemptsLeft===1?"":"s"} left`, W/2, W*0.86);
   }
   function drawGameover(){
     const W=N*PX, s=state.stats;
-    ctx.fillStyle="rgba(10,8,4,.86)"; ctx.fillRect(0,0,W,W);
+    scrim(.88); hearthGlow(false);                 // the fire goes unfed — cold
     ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.font="48px serif"; ctx.fillText("💀", W/2, W*0.22);
-    ctx.font="bold 25px ui-sans-serif,system-ui"; ctx.fillStyle="#e0574a";
+    ctx.font="bold 25px ui-sans-serif,system-ui"; ctx.fillStyle="#d96a63";
     ctx.fillText("THE TRIBE GOES HUNGRY", W/2, W*0.33);
-    ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#9b8f78";
+    ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#c2cad6";
     ctx.fillText(`You fell at ${LEVELS[state.levelIdx].name} — level ${state.levelIdx+1}.`, W/2, W*0.39);
     overlayStats([["Levels cleared",s.cleared],["Animals caught",s.caught],["Meat harvested",s.meat+" lbs"],["Hunters lost",s.huntersLost]], W*0.49);
-    ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
+    ctx.fillStyle="#c2cad6"; ctx.font="bold 15px ui-sans-serif,system-ui";
     ctx.fillText("↻  Click for the level menu", W/2, W*0.86);
   }
 
@@ -1133,21 +1140,21 @@
   }
   function drawWin(){
     const W=N*PX, s=state.stats;
-    ctx.fillStyle="rgba(10,8,4,.84)"; ctx.fillRect(0,0,W,W);
+    scrim(.85); hearthGlow(true);                  // the great fire — peak firelight
     ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.font="52px serif"; ctx.fillText("🏆", W/2, W*0.24);
-    ctx.font="bold 27px ui-sans-serif,system-ui"; ctx.fillStyle="#e6b959";
+    ctx.font="bold 27px ui-sans-serif,system-ui"; ctx.fillStyle="#f0b95e";
     ctx.fillText("THE GREAT HUNT COMPLETE", W/2, W*0.36);
-    ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#9b8f78";
+    ctx.font="14px ui-sans-serif,system-ui"; ctx.fillStyle="#d9c39a";
     ctx.fillText("You fed the tribe through all ten hunts.", W/2, W*0.42);
     const rows=[["Levels cleared", s.cleared],["Animals caught", s.caught],
       ["Meat harvested", s.meat+" lbs"],["Hunters lost", s.huntersLost],["Prey lost to predators", s.preyLost]];
     ctx.font="16px ui-sans-serif,system-ui";
     rows.forEach((r,i)=>{ const y=W*0.52 + i*30;
-      ctx.textAlign="right"; ctx.fillStyle="#cdbf9f"; ctx.fillText(r[0], W/2-12, y);
-      ctx.textAlign="left";  ctx.fillStyle="#efe6d4"; ctx.font="bold 16px ui-sans-serif,system-ui"; ctx.fillText(r[1], W/2+12, y);
+      ctx.textAlign="right"; ctx.fillStyle="#9aa4b4"; ctx.fillText(r[0], W/2-12, y);
+      ctx.textAlign="left";  ctx.fillStyle="#e8ecf3"; ctx.font="bold 16px ui-sans-serif,system-ui"; ctx.fillText(r[1], W/2+12, y);
       ctx.font="16px ui-sans-serif,system-ui"; });
-    ctx.textAlign="center"; ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
+    ctx.textAlign="center"; ctx.fillStyle="#f0b95e"; ctx.font="bold 15px ui-sans-serif,system-ui";
     ctx.fillText("▶  Click for the level menu", W/2, W*0.86);
   }
   function roundRect(x,y,w,h,r){ r=Math.min(r,w/2,h/2);
