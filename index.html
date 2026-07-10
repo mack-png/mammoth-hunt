@@ -21,7 +21,7 @@
   .lvl b{ color:var(--ink); font-size:15px; }
   .lvl .n{ color:var(--accent); font-weight:700; }
   .roster{ font-size:13px; color:var(--muted); margin-top:6px; }
-  .weapons{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:12px 0 8px; }
+  .weapons{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 8px; }
   .wpn{ background:#2a2317; border:1px solid var(--line); border-radius:9px; padding:8px 4px 7px; text-align:center; cursor:pointer; user-select:none; transition:.12s; position:relative; }
   .wpn:hover{ border-color:#5a4d2e; }
   .wpn.sel{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset, 0 4px 14px rgba(224,172,76,.18); }
@@ -68,7 +68,7 @@
     <div class="hint" id="hint"></div>
 
     <div class="tips">
-      <b>🔱 Spear</b> hits the 8 adjacent tiles, heavy. <b>🪨 Rock</b> throws 2 tiles straight (↑↓←→). <b>🕸️ Net</b> deals no damage — it snares small prey &amp; roots big game so spears finish. <b>🌲 Forest</b> hides hunters. <b style="color:#e0574a">Red</b> tiles are entry points; your range can't cover them.
+      <b>🔱 Spear</b> 8 adjacent tiles, heavy. <b>🪨 Rock</b> throws 2 straight (↑↓←→) — beware: it hits the first ally in its line. <b>🕸️ Net</b> no damage; snares small prey &amp; roots big game. <b>🏃 Runner</b> chases and tackles on contact. <b>🌲 Forest</b> hides hunters. <b style="color:#e0574a">Red</b> tiles are entry points. Watch the timer &amp; don't lose more hunters than the level allows.
     </div>
     <div class="legend" id="legend"></div>
     <div id="log"></div>
@@ -107,6 +107,12 @@
     cross:  [[0,0],[1,0],[2,0],[-1,0],[-2,0],[0,1],[0,2],[0,-1],[0,-2]],             // 2 tiles straight
   };
 
+  // ---- Units (HP model shared by emplaced hunters + mobile runners) ----
+  const UNIT_HP = { hunter:12, runner:26 };
+  const FF_CHANCE = 0.5;              // chance a rock in an ally's line actually hits them
+  const RUNNER = { name:"Runner", ico:"🏃", role:"chase + tackle", color:"#d98f5a", step:2.0, dmg:7, hit:0.6 };
+  const RUNNER_INV = [1,1,2,1,2,1,2,2,2,3];   // bonus runners per level
+
   // ---- Animals ---------------------------------------------------------
   const ANIMALS = {
     rabbit: { label:"Rabbit", emoji:"🐇", size:[1,1], hp:[4,6],   meat:10,  step:3.0, kind:"prey",
@@ -118,9 +124,9 @@
     mammoth:{ label:"Mammoth",emoji:"🦣", size:[6,2], hp:[70,90], meat:600, step:0.9, kind:"prey",
               hit:{rock:.50,spear:.75,net:.10}, color:"#6b5540" },
     wolf:   { label:"Wolf",   emoji:"🐺", size:[2,1], hp:[14,18], meat:25,  step:2.6, kind:"predator",
-              attack:.35, hit:{rock:.40,spear:.60,net:.30}, color:"#8a8f96" },
+              attack:.35, bite:7,  hit:{rock:.40,spear:.60,net:.30}, color:"#8a8f96" },
     bear:   { label:"Bear",   emoji:"🐻", size:[2,2], hp:[42,54], meat:220, step:1.5, kind:"predator",
-              attack:.45, hit:{rock:.45,spear:.65,net:.20}, color:"#5a4632" },
+              attack:.45, bite:11, hit:{rock:.45,spear:.65,net:.20}, color:"#5a4632" },
   };
 
   // ---- Levels ----------------------------------------------------------
@@ -158,7 +164,7 @@
     state = Object.assign(state || {}, {
       levelIdx: idx, phase: "placing", terrain,
       hunters: [], runners: [], animals: [], queue: [],
-      spawnTimer: 0, inv: { ...L.inv }, sel: state ? state.sel : "rock",
+      spawnTimer: 0, inv: { ...L.inv, runner: RUNNER_INV[idx] }, sel: state ? state.sel : "rock",
       meat: 0, acc: 0, last: 0, clock: 0, fx: [],
       hover: null, selHunter: null,
       waveStats: {caught:0, meat:0, escaped:0, eaten:0, lost:0},
@@ -275,6 +281,24 @@
     if (coversLaunch(x,y,weapon)) return "Range can't cover an animal's entry tile.";
     return null;
   }
+  function makeHunter(x,y,weapon){ return { x, y, weapon, hp:UNIT_HP.hunter, maxhp:UNIT_HP.hunter, flash:0, dead:false }; }
+  function makeRunner(x,y){ return { x, y, rx:x, ry:y, hp:UNIT_HP.runner, maxhp:UNIT_HP.runner, flash:0, dead:false, prog:0, seed:Math.random()*6.283 }; }
+  function animalAt(cx,cy){ for (const a of state.animals){ if(!a.alive) continue; const [w,h]=ANIMALS[a.key].size;
+    if (cx>=a.x && cx<a.x+w && cy>=a.y && cy<a.y+h) return a; } return null; }
+  function unitAt(cx,cy,exclude){
+    for (const h of state.hunters){ if(h!==exclude && !h.dead && h.x===cx && h.y===cy) return h; }
+    for (const rn of state.runners){ if(rn!==exclude && !rn.dead && rn.x===cx && rn.y===cy) return rn; }
+    return null;
+  }
+  function unitName(u){ return u.weapon ? WEAPONS[u.weapon].name+" hunter" : "runner"; }
+  function killUnit(u, verb, ico){
+    u.dead = true; state.stats.huntersLost++; state.waveStats.lost++;
+    floatText((u.x+0.5)*PX,(u.y+0.5)*PX-6, ico, "#e0574a"); log(verb);
+  }
+  function biteUnit(u,A){ u.hp -= A.bite; u.flash=1; sparks((u.x+0.5)*PX,(u.y+0.5)*PX,"#e0574a",5);
+    if (u.hp<=0 && !u.dead) killUnit(u, `💀 A ${A.label} killed your ${unitName(u)}!`, "💀"); }
+  function ffDamage(u){ u.hp -= WEAPONS.rock.dmg; u.flash=1; sparks((u.x+0.5)*PX,(u.y+0.5)*PX,"#e0574a",4);
+    if (u.hp<=0 && !u.dead) killUnit(u, `🪨 Friendly fire! Your ${unitName(u)} was struck down.`, "💥"); }
   function terrainSpeedAt(a){
     const r = rectOf(a);
     const lx = Math.min(N-1, Math.max(0, a.dir.x>0 ? r.x+r.w-1 : r.x));
@@ -339,6 +363,8 @@
         if (hunterHidden(h)) continue;
         const d=rectDist(r,{x:h.x,y:h.y,w:1,h:1}); if (d<td){ td=d; target={x:h.x,y:h.y,w:1,h:1}; }
       }
+      for (const rn of state.runners){ if(rn.dead) continue;
+        const d=rectDist(r,{x:rn.x,y:rn.y,w:1,h:1}); if (d<td){ td=d; target={x:rn.x,y:rn.y,w:1,h:1}; } }
       let best=null, bestScore=-1e9;
       for (const [dx,dy] of DIRS){
         const nr = {x:r.x+dx, y:r.y+dy, w:r.w, h:r.h};
@@ -361,55 +387,88 @@
     }
   }
 
+  // runners chase the nearest animal, one walkable cell at a time
+  function runnerStep(rn){
+    let tx=null, ty=null, td=1e9;
+    for (const a of state.animals){ if(!a.alive) continue; const [w,h]=ANIMALS[a.key].size;
+      const cX=a.x+w/2, cY=a.y+h/2, d=Math.abs(cX-rn.x)+Math.abs(cY-rn.y);
+      if (d<td){ td=d; tx=cX; ty=cY; } }
+    if (tx===null) return;
+    let best=null, bs=-1e9;
+    for (const [dx,dy] of DIRS){ const nx=rn.x+dx, ny=rn.y+dy;
+      if (!inBounds(nx,ny) || !TERRAIN[state.terrain[ny][nx]].walkable) continue;
+      const s = -(Math.abs(tx-nx)+Math.abs(ty-ny)) + Math.random()*0.3;
+      if (s>bs){ bs=s; best=[dx,dy]; } }
+    if (best){ rn.x+=best[0]; rn.y+=best[1]; }
+  }
+
   // ---- Combat ----------------------------------------------------------
   function acx(a){ return (a.x + ANIMALS[a.key].size[0]/2)*PX; }
   function acy(a){ return (a.y + ANIMALS[a.key].size[1]/2)*PX; }
   function hcx(h){ return (h.x+0.5)*PX; }
   function hcy(h){ return (h.y+0.5)*PX; }
 
-  function resolveCombat(){
-    for (const hnt of state.hunters){
-      if (hnt.dead) continue;
-      const W = WEAPONS[hnt.weapon];
-      const hidden = hunterHidden(hnt);
-      for (const a of state.animals){
-        if (!a.alive) continue;
-        const A = ANIMALS[a.key];
-        if (!reaches(hnt.weapon, hnt.x, hnt.y, rectOf(a))) continue;
-        const chance = Math.min(0.95, A.hit[hnt.weapon] + (hidden?0.12:0));
-        if (Math.random() < chance){
-          addFx({type:"proj", wpn:hnt.weapon, x0:hcx(hnt), y0:hcy(hnt), x1:acx(a), y1:acy(a), life:0.16});
-          const area = A.size[0]*A.size[1];
-          if (hnt.weapon==="net"){
-            if (A.kind==="prey" && area<=2){ a.hp = 0; netFx(acx(a), acy(a), "#8fc7e0"); log(`🕸️ Net snared a ${A.label}!`); }
-            else { a.rootT = Math.min(2.0, a.rootT + 1.2); netFx(acx(a), acy(a), "#8fc7e0"); floatText(acx(a), acy(a)-8, "rooted", "#8fc7e0"); }
-          } else {
-            a.hp -= W.dmg; sparks(acx(a), acy(a), W.color, 5);
-          }
-          a.flash = 1;
-        }
-      }
-    }
+  // spear/net: aimed at an animal in range (no friendly fire)
+  function meleeAttack(hnt){
+    const W=WEAPONS[hnt.weapon], hidden=hunterHidden(hnt);
     for (const a of state.animals){
       if (!a.alive) continue;
       const A = ANIMALS[a.key];
-      if (A.kind !== "predator") continue;
-      const r = rectOf(a);
-      for (const p of state.animals){
-        if (!p.alive || ANIMALS[p.key].kind!=="prey") continue;
-        if (rectDist(r, rectOf(p)) <= 1 && Math.random() < A.attack){
-          p.alive = false; state.stats.preyLost++; state.waveStats.eaten++; sparks(acx(p), acy(p), "#b22", 9);
-          log(`🩸 A ${A.label} brought down a ${ANIMALS[p.key].label} — no meat for you.`);
-        }
-      }
-      for (const hnt of state.hunters){
-        if (hnt.dead || hunterHidden(hnt)) continue;      // can't kill what it can't see
-        if (rectDist(r, {x:hnt.x,y:hnt.y,w:1,h:1}) <= 1 && Math.random() < A.attack){
-          hnt.dead = true; state.stats.huntersLost++; state.waveStats.lost++; sparks(hcx(hnt), hcy(hnt), "#b22", 8); floatText(hcx(hnt), hcy(hnt)-6, "💀", "#e0574a");
-          log(`💀 A ${A.label} killed your ${WEAPONS[hnt.weapon].name} hunter!`);
-        }
+      if (!reaches(hnt.weapon, hnt.x, hnt.y, rectOf(a))) continue;
+      if (Math.random() < Math.min(0.95, A.hit[hnt.weapon] + (hidden?0.12:0))){
+        addFx({type:"proj", wpn:hnt.weapon, x0:hcx(hnt), y0:hcy(hnt), x1:acx(a), y1:acy(a), life:0.16});
+        const area = A.size[0]*A.size[1];
+        if (hnt.weapon==="net"){
+          if (A.kind==="prey" && area<=2){ a.hp = 0; netFx(acx(a), acy(a), "#8fc7e0"); log(`🕸️ Net snared a ${A.label}!`); }
+          else { a.rootT = Math.min(2.0, a.rootT + 1.2); netFx(acx(a), acy(a), "#8fc7e0"); floatText(acx(a), acy(a)-8, "rooted", "#8fc7e0"); }
+        } else { a.hp -= W.dmg; sparks(acx(a), acy(a), W.color, 5); }
+        a.flash = 1;
       }
     }
+  }
+  // rock: a thrown line that hits the FIRST thing in each arm — animal OR ally (friendly fire)
+  function rockAttack(hnt){
+    const W=WEAPONS.rock, hidden=hunterHidden(hnt);
+    for (const [dx,dy] of DIRS){
+      for (let d=1; d<=2; d++){
+        const cx=hnt.x+dx*d, cy=hnt.y+dy*d;
+        if (!inBounds(cx,cy) || TERRAIN[state.terrain[cy][cx]].block) break;   // boulder blocks the throw
+        const u = unitAt(cx,cy,hnt);
+        if (u){ addFx({type:"proj", wpn:"rock", x0:hcx(hnt), y0:hcy(hnt), x1:(u.x+0.5)*PX, y1:(u.y+0.5)*PX, life:0.16});
+          if (Math.random()<FF_CHANCE) ffDamage(u); break; }
+        const a = animalAt(cx,cy);
+        if (a){ const A=ANIMALS[a.key];
+          addFx({type:"proj", wpn:"rock", x0:hcx(hnt), y0:hcy(hnt), x1:acx(a), y1:acy(a), life:0.16});
+          if (Math.random() < Math.min(0.95, A.hit.rock + (hidden?0.12:0))){ a.hp-=W.dmg; a.flash=1; sparks(acx(a),acy(a),W.color,5); }
+          break; }
+      }
+    }
+  }
+
+  function resolveCombat(){
+    for (const hnt of state.hunters){ if (hnt.dead) continue;
+      if (hnt.weapon==="rock") rockAttack(hnt); else meleeAttack(hnt); }
+
+    // runners tackle any animal they overlap
+    for (const rn of state.runners){ if (rn.dead) continue;
+      for (const a of state.animals){ if (!a.alive) continue; const [w,h]=ANIMALS[a.key].size;
+        if (rn.x>=a.x && rn.x<a.x+w && rn.y>=a.y && rn.y<a.y+h && Math.random()<RUNNER.hit){
+          a.hp -= RUNNER.dmg; a.flash=1; sparks(acx(a),acy(a),RUNNER.color,4); } } }
+
+    // predators: eat prey, maul the units they reach
+    for (const a of state.animals){
+      if (!a.alive) continue; const A = ANIMALS[a.key];
+      if (A.kind !== "predator") continue; const r = rectOf(a);
+      for (const p of state.animals){ if (!p.alive || ANIMALS[p.key].kind!=="prey") continue;
+        if (rectDist(r, rectOf(p)) <= 1 && Math.random() < A.attack){
+          p.alive = false; state.stats.preyLost++; state.waveStats.eaten++; sparks(acx(p), acy(p), "#b22", 9);
+          log(`🩸 A ${A.label} brought down a ${ANIMALS[p.key].label} — no meat for you.`); } }
+      for (const hnt of state.hunters){ if (hnt.dead || hunterHidden(hnt)) continue;
+        if (rectDist(r, {x:hnt.x,y:hnt.y,w:1,h:1}) <= 1 && Math.random() < A.attack) biteUnit(hnt, A); }
+      for (const rn of state.runners){ if (rn.dead) continue;
+        if (rectDist(r, {x:rn.x,y:rn.y,w:1,h:1}) <= 1 && Math.random() < A.attack) biteUnit(rn, A); }
+    }
+
     for (const a of state.animals){
       if (a.alive && a.hp <= 0){
         a.alive = false;
@@ -420,7 +479,10 @@
         renderMeat();
       }
     }
+    for (const u of state.hunters) if (u.flash>0) u.flash=Math.max(0,u.flash-TICK*3);
+    for (const u of state.runners) if (u.flash>0) u.flash=Math.max(0,u.flash-TICK*3);
     state.hunters = state.hunters.filter(h=>!h.dead);
+    state.runners = state.runners.filter(r=>!r.dead);
     state.animals = state.animals.filter(a=>a.alive || a.flash>0);
   }
 
@@ -481,6 +543,9 @@
       if (a.rootT > 0 && a.age < 14){ a.rootT = Math.max(0, a.rootT - dt); }   // netted in place
       else { a.prog += a.rate * terrainSpeedAt(a) * dt; while (a.prog >= 1 && a.alive){ a.prog -= 1; aiStep(a); } }
     }
+    for (const rn of state.runners){ if (rn.dead) continue;
+      rn.prog += RUNNER.step * TERRAIN[state.terrain[rn.y][rn.x]].speed * dt;
+      while (rn.prog >= 1){ rn.prog -= 1; runnerStep(rn); } }
     state.acc += dt;
     while (state.acc >= TICK){ state.acc -= TICK; resolveCombat(); }
     for (const a of state.animals) if (a.flash>0) a.flash = Math.max(0, a.flash - dt*3);
@@ -574,20 +639,47 @@
       ctx.beginPath(); ctx.moveTo(mx+s.dir.x*11, my+s.dir.y*11); ctx.lineTo(mx+s.dir.x*20, my+s.dir.y*20); ctx.stroke();
       ctx.globalAlpha=1;
     }
-    // hover preview (green-ish = ok, red = blocked)
+    // friendly-fire warning: a rock in an ally's line shows a red danger tether
+    for (const h of state.hunters) if (h.weapon==="rock") drawFFLines(h.x,h.y,h);
+    // hover preview (weapon color = ok, red = blocked)
     const hv = state.hover;
     if (hv){
       const onHunter = state.hunters.find(h=>h.x===hv.x&&h.y===hv.y);
+      const onRunner = state.runners.find(r=>r.x===hv.x&&r.y===hv.y);
       if (onHunter){ outlineWeapon(onHunter.x,onHunter.y,onHunter.weapon, WEAPONS[onHunter.weapon].color); }
-      else if (state.inv[state.sel]>0){
+      else if (onRunner){ ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.strokeRect(hv.x*PX+2,hv.y*PX+2,PX-4,PX-4); }
+      else if (state.sel==="runner"){
+        if (state.inv.runner>0){ const err=runnerError(hv.x,hv.y);
+          ctx.strokeStyle=err?"#e0574a":RUNNER.color; ctx.lineWidth=2; ctx.strokeRect(hv.x*PX+2,hv.y*PX+2,PX-4,PX-4);
+          if (!err){ ctx.globalAlpha=0.55; drawRunner({x:hv.x,y:hv.y,rx:hv.x,ry:hv.y,hp:1,maxhp:1,flash:0},1); ctx.globalAlpha=1; } }
+      } else if (state.inv[state.sel]>0){
         const err = placementError(hv.x,hv.y,state.sel);
         outlineWeapon(hv.x,hv.y,state.sel, err ? "#e0574a" : WEAPONS[state.sel].color);
-        if (!err){ ctx.globalAlpha=0.5; drawHunterToken(hv.x,hv.y,state.sel,false); ctx.globalAlpha=1; }
+        if (!err){ ctx.globalAlpha=0.5; drawHunterToken(hv.x,hv.y,state.sel,false); ctx.globalAlpha=1;
+          if (state.sel==="rock") drawFFLines(hv.x,hv.y,null); }
       }
     }
     if (state.selHunter && state.hunters.includes(state.selHunter)){
       const s=state.selHunter; outlineWeapon(s.x,s.y,s.weapon,"#fff");
     }
+  }
+  function drawFFLines(hx,hy,exclude){
+    for (const [dx,dy] of DIRS){
+      for (let d=1; d<=2; d++){
+        const cx=hx+dx*d, cy=hy+dy*d;
+        if (!inBounds(cx,cy) || TERRAIN[state.terrain[cy][cx]].block) break;
+        const u=unitAt(cx,cy,exclude);
+        if (u){ ctx.strokeStyle="rgba(224,87,74,.85)"; ctx.lineWidth=2.5; ctx.setLineDash([5,4]);
+          ctx.beginPath(); ctx.moveTo((hx+0.5)*PX,(hy+0.5)*PX); ctx.lineTo((u.x+0.5)*PX,(u.y+0.5)*PX); ctx.stroke(); ctx.setLineDash([]); break; }
+        if (animalAt(cx,cy)) break;
+      }
+    }
+  }
+  function runnerError(x,y){
+    if (!TERRAIN[state.terrain[y][x]].walkable) return "Can't stand on water or rock.";
+    if (state.launchTiles.has(y*N+x)) return "Can't start on an entry tile.";
+    if (unitAt(x,y,null)) return "That tile is occupied.";
+    return null;
   }
   function outlineWeapon(hx,hy,weapon,color){
     forWeaponCells(hx,hy,weapon,(x,y)=>{
@@ -597,14 +689,30 @@
   }
 
   // ---- Tokens ----------------------------------------------------------
-  function drawHunterToken(x,y,weapon,hidden){
+  function drawHunterToken(x,y,weapon,hidden,unit){
     const W=WEAPONS[weapon], cx=(x+0.5)*PX, cy=(y+0.5)*PX, s=PX-12;
     ctx.fillStyle="rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(cx, cy+s*0.42, s*0.44, s*0.18, 0,0,7); ctx.fill();
-    const g=ctx.createLinearGradient(0,cy-s/2,0,cy+s/2); g.addColorStop(0,"#3b3320"); g.addColorStop(1,"#241d12");
+    const flash = unit && unit.flash>0;
+    const g=ctx.createLinearGradient(0,cy-s/2,0,cy+s/2);
+    g.addColorStop(0, flash?"#7a2a1a":"#3b3320"); g.addColorStop(1, flash?"#5a1f14":"#241d12");
     ctx.fillStyle=g; roundRect(cx-s/2, cy-s/2, s, s, 9); ctx.fill();
     ctx.strokeStyle=W.color; ctx.lineWidth=2.2; roundRect(cx-s/2, cy-s/2, s, s, 9); ctx.stroke();
     if (hidden){ ctx.fillStyle="#4c7a34"; ctx.beginPath(); ctx.arc(cx+s*0.34, cy-s*0.34, 4, 0, 7); ctx.fill(); }
     ctx.font=(s*0.5|0)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(W.ico, cx, cy+1);
+    if (unit && unit.hp<unit.maxhp){ const bw=s*0.9, frac=Math.max(0,unit.hp/unit.maxhp), bx=cx-bw/2, by=cy+s*0.5-2;
+      ctx.fillStyle="rgba(0,0,0,.6)"; roundRect(bx,by,bw,3,1.5); ctx.fill();
+      ctx.fillStyle="#8fd06a"; roundRect(bx,by,bw*frac,3,1.5); ctx.fill(); }
+  }
+  function drawRunner(rn,dt){
+    const k=Math.min(1,dt*12); rn.rx+=(rn.x-rn.rx)*k; rn.ry+=(rn.y-rn.ry)*k;
+    const cx=(rn.rx+0.5)*PX, cy=(rn.ry+0.5)*PX, s=PX-14;
+    ctx.fillStyle="rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(cx,cy+s*0.44,s*0.4,s*0.16,0,0,7); ctx.fill();
+    ctx.fillStyle = rn.flash>0?"#e86a4c":RUNNER.color; ctx.beginPath(); ctx.arc(cx,cy,s*0.44,0,7); ctx.fill();
+    ctx.strokeStyle="#3a2a18"; ctx.lineWidth=2; ctx.stroke();
+    ctx.font=(s*0.58|0)+"px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("🏃",cx,cy+1);
+    if (rn.hp<rn.maxhp){ const bw=s*0.9, frac=Math.max(0,rn.hp/rn.maxhp), bx=cx-bw/2, by=cy+s*0.5;
+      ctx.fillStyle="rgba(0,0,0,.6)"; roundRect(bx,by,bw,4,2); ctx.fill();
+      ctx.fillStyle="#d98f5a"; roundRect(bx,by,bw*frac,4,2); ctx.fill(); }
   }
 
   function drawAnimal(a,dt){
@@ -646,7 +754,8 @@
     for (let i=0;i<=N;i++){ ctx.beginPath(); ctx.moveTo(i*PX,0); ctx.lineTo(i*PX,N*PX); ctx.stroke();
                            ctx.beginPath(); ctx.moveTo(0,i*PX); ctx.lineTo(N*PX,i*PX); ctx.stroke(); }
     if (state.phase==="placing") drawPlacingOverlay();
-    for (const h of state.hunters) drawHunterToken(h.x,h.y,h.weapon,hunterHidden(h));
+    for (const h of state.hunters) drawHunterToken(h.x,h.y,h.weapon,hunterHidden(h),h);
+    for (const rn of state.runners) drawRunner(rn,dt);
     for (const a of state.animals) drawAnimal(a,dt);
     drawFx();
     if (state.phase==="running") drawHUD();
@@ -746,6 +855,9 @@
       el.className="wpn"+(state.sel===k?" sel":"");
       el.innerHTML=`<div class="ico">${W.ico}</div><div class="nm">${W.name}</div><div class="rg">${W.role}</div><div class="ct">×${state.inv[k]}</div>`;
       el.onclick=()=>{ state.sel=k; state.selHunter=null; renderUI(); }; wrap.appendChild(el); }
+    { const el=document.createElement("div"); el.className="wpn"+(state.sel==="runner"?" sel":"");
+      el.innerHTML=`<div class="ico">${RUNNER.ico}</div><div class="nm">${RUNNER.name}</div><div class="rg">${RUNNER.role}</div><div class="ct">×${state.inv.runner}</div>`;
+      el.onclick=()=>{ state.sel="runner"; state.selHunter=null; renderUI(); }; wrap.appendChild(el); }
     const start=document.getElementById("start");
     start.disabled=state.phase!=="placing";
     start.textContent = state.phase==="won"?"You Win 🏆"
@@ -775,7 +887,9 @@
   canvas.addEventListener("pointerleave",()=>{ state.hover=null; });
   canvas.addEventListener("contextmenu",(e)=>{ e.preventDefault(); if(state.phase!=="placing")return;
     const c=cellAt(e); const i=state.hunters.findIndex(h=>h.x===c.x&&h.y===c.y);
-    if(i>=0){ state.inv[state.hunters[i].weapon]++; state.hunters.splice(i,1); state.selHunter=null; renderUI(); } });
+    if(i>=0){ state.inv[state.hunters[i].weapon]++; state.hunters.splice(i,1); state.selHunter=null; renderUI(); return; }
+    const j=state.runners.findIndex(r=>r.x===c.x&&r.y===c.y);
+    if(j>=0){ state.inv.runner++; state.runners.splice(j,1); renderUI(); } });
   canvas.addEventListener("pointerdown",(e)=>{
     if (state.phase==="won" || state.phase==="gameover"){ state=null; startLevel(0); return; }
     if (state.phase==="results"){
@@ -791,16 +905,23 @@
       else { state.selHunter=hit; flashHint(`${WEAPONS[hit.weapon].name} · ${WEAPONS[hit.weapon].role}${hunterHidden(hit)?" · hidden in forest":""}. Click again to remove.`); }
       renderUI(); return;
     }
+    const hitR=state.runners.find(r=>r.x===x&&r.y===y);
+    if (hitR){ state.inv.runner++; state.runners.splice(state.runners.indexOf(hitR),1); state.selHunter=null; renderUI(); return; }
     state.selHunter=null;
+    if (state.sel==="runner"){
+      if (state.inv.runner<=0){ flashHint("No runners left."); return; }
+      const rerr=runnerError(x,y); if (rerr){ flashHint(rerr); return; }
+      state.runners.push(makeRunner(x,y)); state.inv.runner--; renderUI(); return;
+    }
     if (state.inv[state.sel]<=0){ flashHint("No "+WEAPONS[state.sel].name+" hunters left."); return; }
     const err = placementError(x,y,state.sel);
     if (err){ flashHint(err); return; }
-    state.hunters.push({x,y,weapon:state.sel}); state.inv[state.sel]--; renderUI();
+    state.hunters.push(makeHunter(x,y,state.sel)); state.inv[state.sel]--; renderUI();
   });
 
   document.getElementById("start").onclick=()=>{
     if (state.phase!=="placing") return;
-    if (state.hunters.length===0){ flashHint("Place at least one hunter first."); return; }
+    if (state.hunters.length + state.runners.length === 0){ flashHint("Place at least one hunter or runner first."); return; }
     state.queue=state.plan; state.plan=[]; state.launchTiles=new Set();
     state.waveStats={caught:0, meat:0, escaped:0, eaten:0, lost:0};
     state.timeLeft=LEVELS[state.levelIdx].time;
@@ -824,11 +945,11 @@
   window.__mh = {
     get state(){ return state; },
     step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS, WEAPONS,
-    coversLaunch, weaponOffsets, placementError,
+    coversLaunch, weaponOffsets, placementError, makeHunter, makeRunner,
     autoPlace(n=6, weapon="rock"){ state.sel=weapon;
       for (let y=0;y<N && state.hunters.length<n;y++) for (let x=0;x<N && state.hunters.length<n;x++){
         if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y) && state.inv[weapon]>0){
-          state.hunters.push({x,y,weapon}); state.inv[weapon]--; } } },
+          state.hunters.push(makeHunter(x,y,weapon)); state.inv[weapon]--; } } },
     begin(){ state.queue = state.plan && state.plan.length ? state.plan : buildRoster(LEVELS[state.levelIdx]); state.plan=[]; state.launchTiles=new Set();
       state.waveStats={caught:0,meat:0,escaped:0,eaten:0,lost:0}; state.timeLeft=LEVELS[state.levelIdx].time; state.phase="running"; },
     run(seconds=30, dt=1/30){ let t=0; while(t<seconds && state.phase==="running"){ step(dt); t+=dt; } return {phase:state.phase, meat:state.meat, level:state.levelIdx+1}; },
