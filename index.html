@@ -139,28 +139,28 @@
   };
 
   // ---- Levels ----------------------------------------------------------
-  // goal = meat needed · time = seconds on the clock · maxLoss = hunters you may lose before it's a fail
+  // stars = [bronze,silver,gold] meat cutoffs · time = seconds · maxLoss = hunters you may lose before it's a fail
   const LEVELS = [
-    { name:"First Blood",     goal:140,  roster:{rabbit:4,deer:3},
-      terr:{forest:2,marsh:0,water:0,rock:1}, inv:{rock:2,spear:2,net:2}, time:32, maxLoss:1 },
-    { name:"The Deer Run",    goal:250,  roster:{rabbit:3,deer:6},
-      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:2,net:2}, time:34, maxLoss:1 },
-    { name:"Bison Plains",    goal:850,  roster:{deer:3,bison:3},
-      terr:{forest:1,marsh:0,water:0,rock:2}, inv:{rock:3,spear:3,net:2}, time:36, maxLoss:2 },
-    { name:"Wolves at Dusk",  goal:200,  roster:{deer:5,wolf:3},
-      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:3,net:3}, time:34, maxLoss:3 },
-    { name:"Marshland",       goal:620,  roster:{rabbit:4,deer:4,bison:2},
-      terr:{forest:1,marsh:3,water:2,rock:0}, inv:{rock:4,spear:3,net:3}, time:38, maxLoss:2 },
-    { name:"The Pack",        goal:220,  roster:{deer:4,wolf:5},
-      terr:{forest:4,marsh:0,water:0,rock:1}, inv:{rock:4,spear:4,net:3}, time:36, maxLoss:4 },
-    { name:"Bear Country",    goal:750,  roster:{bison:3,bear:3},
-      terr:{forest:2,marsh:0,water:0,rock:3}, inv:{rock:4,spear:4,net:3}, time:40, maxLoss:5 },
-    { name:"The Mammoth",     goal:900,  roster:{deer:3,bison:2,mammoth:1},
-      terr:{forest:2,marsh:1,water:0,rock:1}, inv:{rock:5,spear:4,net:3}, time:42, maxLoss:3 },
-    { name:"Predator & Prey", goal:600,  roster:{deer:4,bison:2,wolf:4,bear:2},
-      terr:{forest:3,marsh:1,water:0,rock:2}, inv:{rock:5,spear:5,net:4}, time:42, maxLoss:5 },
-    { name:"The Great Hunt",  goal:900,  roster:{bison:3,mammoth:2,wolf:3,bear:2},
-      terr:{forest:3,marsh:2,water:1,rock:2}, inv:{rock:6,spear:5,net:4}, time:48, maxLoss:6 },
+    { name:"First Blood",     roster:{rabbit:4,deer:3},
+      terr:{forest:2,marsh:0,water:0,rock:1}, inv:{rock:2,spear:2,net:2}, time:32, maxLoss:1, stars:[90,160,230] },
+    { name:"The Deer Run",    roster:{rabbit:3,deer:6},
+      terr:{forest:3,marsh:1,water:1,rock:1}, inv:{rock:3,spear:2,net:2}, time:34, maxLoss:1, stars:[170,300,410] },
+    { name:"Bison Plains",    roster:{deer:3,bison:3},
+      terr:{forest:1,marsh:0,water:2,rock:2}, inv:{rock:3,spear:3,net:2}, time:36, maxLoss:2, stars:[600,950,1200] },
+    { name:"Wolves at Dusk",  roster:{deer:5,wolf:3},
+      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:3,net:3}, time:34, maxLoss:3, stars:[60,180,280] },
+    { name:"Marshland",       roster:{rabbit:4,deer:4,bison:2},
+      terr:{forest:1,marsh:3,water:4,rock:0}, inv:{rock:4,spear:3,net:3}, time:38, maxLoss:2, stars:[480,780,990] },
+    { name:"The Pack",        roster:{deer:4,wolf:5},
+      terr:{forest:4,marsh:0,water:0,rock:1}, inv:{rock:4,spear:4,net:3}, time:36, maxLoss:4, stars:[90,170,300] },
+    { name:"Bear Country",    roster:{bison:3,bear:3},
+      terr:{forest:2,marsh:0,water:1,rock:3}, inv:{rock:4,spear:4,net:3}, time:40, maxLoss:5, stars:[250,600,1050] },
+    { name:"The Mammoth",     roster:{deer:3,bison:2,mammoth:1},
+      terr:{forest:2,marsh:1,water:3,rock:1}, inv:{rock:5,spear:4,net:3}, time:42, maxLoss:3, stars:[600,1050,1400] },
+    { name:"Predator & Prey", roster:{deer:4,bison:2,wolf:4,bear:2},
+      terr:{forest:3,marsh:1,water:2,rock:2}, inv:{rock:5,spear:5,net:4}, time:42, maxLoss:5, stars:[180,480,900] },
+    { name:"The Great Hunt",  roster:{bison:3,mammoth:2,wolf:3,bear:2},
+      terr:{forest:3,marsh:2,water:1,rock:2}, inv:{rock:6,spear:5,net:4}, time:48, maxLoss:6, stars:[250,550,950] },
   ];
 
   // ---- State -----------------------------------------------------------
@@ -691,10 +691,12 @@
       const ex = Math.min(N-1,Math.max(0, s.dir.x>0? 0 : s.dir.x<0? N-1 : s.x));
       const ey = Math.min(N-1,Math.max(0, s.dir.y>0? 0 : s.dir.y<0? N-1 : s.y));
       const mx=(ex+0.5)*PX, my=(ey+0.5)*PX;
-      ctx.globalAlpha=0.65; ctx.font="17px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      // dark backing disc so the animal emoji reads clearly against any terrain
+      ctx.globalAlpha=0.5; ctx.fillStyle="#0e0c08"; ctx.beginPath(); ctx.arc(mx,my,PX*0.34,0,7); ctx.fill();
+      ctx.globalAlpha=0.95; ctx.font="24px serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.fillText(A.emoji, mx, my);
-      ctx.strokeStyle=A.kind==="predator"?"#e0574a":"#e6d38a"; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(mx+s.dir.x*11, my+s.dir.y*11); ctx.lineTo(mx+s.dir.x*20, my+s.dir.y*20); ctx.stroke();
+      ctx.strokeStyle=A.kind==="predator"?"#e0574a":"#e6d38a"; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(mx+s.dir.x*13, my+s.dir.y*13); ctx.lineTo(mx+s.dir.x*23, my+s.dir.y*23); ctx.stroke();
       ctx.globalAlpha=1;
     }
     // friendly-fire warning: a rock in an ally's line shows a red danger tether
@@ -817,6 +819,7 @@
     for (const rn of state.runners) drawRunner(rn,dt);
     for (const a of state.animals) drawAnimal(a,dt);
     drawFx();
+    drawClouds();
     if (state.phase==="running") drawHUD();
     // vignette
     const vg=ctx.createRadialGradient(N*PX/2,N*PX/2,N*PX*0.3,N*PX/2,N*PX/2,N*PX*0.72);
@@ -827,6 +830,17 @@
     else if (state.phase==="gameover") drawGameover();
   }
 
+  // soft cloud shadows drifting across the map — pure atmosphere
+  function drawClouds(){
+    const W=N*PX; ctx.save();
+    const puffs=[[0,0,58],[48,10,46],[-46,13,44],[16,-20,40]];
+    for (let i=0;i<3;i++){
+      const speed=5+i*3.5, x=((state.clock*speed + i*250) % (W+260)) - 130, y=W*(0.18+i*0.31);
+      ctx.globalAlpha=0.055; ctx.fillStyle="#dfe8f2";
+      for (const [ox,oy,r] of puffs){ ctx.beginPath(); ctx.ellipse(x+ox, y+oy, r, r*0.6, 0,0,7); ctx.fill(); }
+    }
+    ctx.restore();
+  }
   function drawHUD(){
     const W=N*PX, L=LEVELS[state.levelIdx], th=thresholds(L), frac=Math.max(0,state.timeLeft/L.time);
     ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(0,0,W,7);
