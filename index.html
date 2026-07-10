@@ -109,7 +109,7 @@
 
   // ---- Units (HP model shared by emplaced hunters + mobile runners) ----
   const UNIT_HP = { hunter:12, runner:26 };
-  const FF_CHANCE = 0.5;              // chance a rock in an ally's line actually hits them
+  const FF_CHANCE = 0.18;            // chance a rock in an ally's line actually hits them
   const RUNNER = { name:"Runner", ico:"🏃", role:"chase + tackle", color:"#d98f5a", step:2.0, dmg:7, hit:0.6 };
   const RUNNER_INV = [1,1,2,1,2,1,2,2,2,3];   // bonus runners per level
 
@@ -124,34 +124,34 @@
     mammoth:{ label:"Mammoth",emoji:"🦣", size:[6,2], hp:[70,90], meat:600, step:0.9, kind:"prey",
               hit:{rock:.50,spear:.75,net:.10}, color:"#6b5540" },
     wolf:   { label:"Wolf",   emoji:"🐺", size:[2,1], hp:[14,18], meat:25,  step:2.6, kind:"predator",
-              attack:.35, bite:7,  hit:{rock:.40,spear:.60,net:.30}, color:"#8a8f96" },
+              attack:.26, bite:6,  hit:{rock:.40,spear:.60,net:.30}, color:"#8a8f96" },
     bear:   { label:"Bear",   emoji:"🐻", size:[2,2], hp:[42,54], meat:220, step:1.5, kind:"predator",
-              attack:.45, bite:11, hit:{rock:.45,spear:.65,net:.20}, color:"#5a4632" },
+              attack:.34, bite:9,  hit:{rock:.45,spear:.65,net:.20}, color:"#5a4632" },
   };
 
   // ---- Levels ----------------------------------------------------------
   // goal = meat needed · time = seconds on the clock · maxLoss = hunters you may lose before it's a fail
   const LEVELS = [
-    { name:"First Blood",     goal:120,  roster:{rabbit:4,deer:3},
+    { name:"First Blood",     goal:140,  roster:{rabbit:4,deer:3},
       terr:{forest:2,marsh:0,water:0,rock:1}, inv:{rock:2,spear:2,net:2}, time:32, maxLoss:1 },
-    { name:"The Deer Run",    goal:220,  roster:{rabbit:3,deer:6},
+    { name:"The Deer Run",    goal:250,  roster:{rabbit:3,deer:6},
       terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:2,net:2}, time:34, maxLoss:1 },
-    { name:"Bison Plains",    goal:700,  roster:{deer:3,bison:3},
-      terr:{forest:1,marsh:0,water:0,rock:2}, inv:{rock:3,spear:3,net:2}, time:36, maxLoss:1 },
+    { name:"Bison Plains",    goal:850,  roster:{deer:3,bison:3},
+      terr:{forest:1,marsh:0,water:0,rock:2}, inv:{rock:3,spear:3,net:2}, time:36, maxLoss:2 },
     { name:"Wolves at Dusk",  goal:200,  roster:{deer:5,wolf:3},
-      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:3,net:3}, time:34, maxLoss:2 },
-    { name:"Marshland",       goal:520,  roster:{rabbit:4,deer:4,bison:2},
-      terr:{forest:1,marsh:3,water:2,rock:0}, inv:{rock:4,spear:3,net:3}, time:38, maxLoss:1 },
+      terr:{forest:3,marsh:1,water:0,rock:1}, inv:{rock:3,spear:3,net:3}, time:34, maxLoss:3 },
+    { name:"Marshland",       goal:620,  roster:{rabbit:4,deer:4,bison:2},
+      terr:{forest:1,marsh:3,water:2,rock:0}, inv:{rock:4,spear:3,net:3}, time:38, maxLoss:2 },
     { name:"The Pack",        goal:220,  roster:{deer:4,wolf:5},
-      terr:{forest:4,marsh:0,water:0,rock:1}, inv:{rock:4,spear:4,net:3}, time:36, maxLoss:3 },
+      terr:{forest:4,marsh:0,water:0,rock:1}, inv:{rock:4,spear:4,net:3}, time:36, maxLoss:4 },
     { name:"Bear Country",    goal:750,  roster:{bison:3,bear:3},
-      terr:{forest:2,marsh:0,water:0,rock:3}, inv:{rock:4,spear:4,net:3}, time:40, maxLoss:3 },
-    { name:"The Mammoth",     goal:800,  roster:{deer:3,bison:2,mammoth:1},
-      terr:{forest:2,marsh:1,water:0,rock:1}, inv:{rock:5,spear:4,net:3}, time:42, maxLoss:2 },
+      terr:{forest:2,marsh:0,water:0,rock:3}, inv:{rock:4,spear:4,net:3}, time:40, maxLoss:5 },
+    { name:"The Mammoth",     goal:900,  roster:{deer:3,bison:2,mammoth:1},
+      terr:{forest:2,marsh:1,water:0,rock:1}, inv:{rock:5,spear:4,net:3}, time:42, maxLoss:3 },
     { name:"Predator & Prey", goal:600,  roster:{deer:4,bison:2,wolf:4,bear:2},
-      terr:{forest:3,marsh:1,water:0,rock:2}, inv:{rock:5,spear:5,net:4}, time:42, maxLoss:4 },
+      terr:{forest:3,marsh:1,water:0,rock:2}, inv:{rock:5,spear:5,net:4}, time:42, maxLoss:5 },
     { name:"The Great Hunt",  goal:900,  roster:{bison:3,mammoth:2,wolf:3,bear:2},
-      terr:{forest:3,marsh:2,water:1,rock:2}, inv:{rock:6,spear:5,net:4}, time:48, maxLoss:4 },
+      terr:{forest:3,marsh:2,water:1,rock:2}, inv:{rock:6,spear:5,net:4}, time:48, maxLoss:6 },
   ];
 
   // ---- State -----------------------------------------------------------
