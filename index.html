@@ -191,7 +191,7 @@
     state.launchTiles = computeLaunchTiles();
     if (idx===0 || !state.stats) state.stats = {caught:0, meat:0, huntersLost:0, preyLost:0, cleared:0};
     if (freshLevel) state.attempts = MAX_ATTEMPTS;
-    log(`— Level ${idx+1}: ${L.name} — need ${L.goal} lbs · ${state.attempts} attempt${state.attempts===1?"":"s"}. Read the herd, then place.`);
+    log(`— Level ${idx+1}: ${L.name} — 🥉 ${thresholds(L).bronze} lbs to clear · ${state.attempts} attempt${state.attempts===1?"":"s"}. Read the herd, then place.`);
     renderUI();
   }
 
