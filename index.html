@@ -91,9 +91,9 @@
   const PX = canvas.width / N;
   const TICK = 0.20;
   const MAX_ATTEMPTS = 3;             // failed tries on a level before game over
-  const ATTACK_INTERVAL = 0.75;      // seconds between a unit's shots (deliberate, not a spray)
-  const PROJ_LIFE = 0.5;             // slower, readable projectile animation
-  const STAR_PCT = { bronze:0.35, silver:0.62, gold:0.88 };   // medal = % of the herd's meat you bag
+  const ATTACK_INTERVAL = 0.40;      // seconds between a unit's shots (deliberate, not a spray)
+  const PROJ_LIFE = 0.35;            // slower, readable projectile animation
+  const STAR_PCT = { bronze:0.30, silver:0.55, gold:0.82 };   // fallback if a level has no explicit thresholds
 
   // ---- Terrain ---------------------------------------------------------
   const TERRAIN = {
@@ -106,8 +106,8 @@
 
   // ---- Weapons (distinct ranges + roles) ------------------------------
   const WEAPONS = {
-    rock: { name:"Rock",  ico:"🪨", dmg:1,  shape:"cross",  color:"#b9c0c7", role:"2 straight" },
-    spear:{ name:"Spear", ico:"🔱", dmg:3,  shape:"square", color:"#e6b959", role:"adjacent" },
+    rock: { name:"Rock",  ico:"🪨", dmg:2,  shape:"cross",  color:"#b9c0c7", role:"2 straight" },
+    spear:{ name:"Spear", ico:"🔱", dmg:6,  shape:"square", color:"#e6b959", role:"adjacent" },
     net:  { name:"Net",   ico:"🕸️", dmg:0,  shape:"square", color:"#8fc7e0", role:"snare/root" },
   };
   // range footprints (offsets from the hunter cell)
@@ -119,7 +119,7 @@
   // ---- Units (HP model shared by emplaced hunters + mobile runners) ----
   const UNIT_HP = { hunter:12, runner:26 };
   const FF_CHANCE = 0.18;            // chance a rock in an ally's line actually hits them
-  const RUNNER = { name:"Runner", ico:"🏃", role:"chase + tackle", color:"#d98f5a", step:2.0, dmg:2, hit:0.6 };
+  const RUNNER = { name:"Runner", ico:"🏃", role:"chase + tackle", color:"#d98f5a", step:2.0, dmg:4, hit:0.6 };
   const RUNNER_INV = [1,1,2,1,2,1,2,2,2,3];   // bonus runners per level
 
   // ---- Animals ---------------------------------------------------------
@@ -603,6 +603,7 @@
 
   function levelTotalMeat(L){ let m=0; for (const k in L.roster) m += L.roster[k]*ANIMALS[k].meat; return m; }
   function thresholds(L){ const t=levelTotalMeat(L);
+    if (L.stars) return { total:t, bronze:L.stars[0], silver:L.stars[1], gold:L.stars[2] };
     return { total:t, bronze:Math.round(t*STAR_PCT.bronze), silver:Math.round(t*STAR_PCT.silver), gold:Math.round(t*STAR_PCT.gold) }; }
   function medalFor(meat, th){ return meat>=th.gold?3 : meat>=th.silver?2 : meat>=th.bronze?1 : 0; }
   const MEDAL_ICON = ["", "🥉", "🥈", "🥇"], MEDAL_NAME = ["", "Bronze", "Silver", "Gold"];
@@ -1015,8 +1016,8 @@
   // Debug hook (harmless): drive the sim without requestAnimationFrame (paused in hidden tabs).
   window.__mh = {
     get state(){ return state; },
-    step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS, WEAPONS,
-    coversLaunch, weaponOffsets, placementError, makeHunter, makeRunner,
+    step, resolveCombat, buildRoster, startLevel, ANIMALS, LEVELS, WEAPONS, RUNNER,
+    coversLaunch, weaponOffsets, placementError, makeHunter, makeRunner, thresholds, levelTotalMeat,
     autoPlace(n=6, weapon="rock"){ state.sel=weapon;
       for (let y=0;y<N && state.hunters.length<n;y++) for (let x=0;x<N && state.hunters.length<n;x++){
         if (TERRAIN[state.terrain[y][x]].walkable && !state.hunters.some(h=>h.x===x&&h.y===y) && state.inv[weapon]>0){
