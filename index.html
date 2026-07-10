@@ -25,7 +25,7 @@
   .lvl .n{ color:var(--accent); font-weight:700; }
   .roster{ font-size:13px; color:var(--muted); margin-top:6px; }
   .weapons{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 8px; }
-  .wpn{ background:#2a2317; border:1px solid var(--line); border-radius:9px; padding:8px 4px 7px; text-align:center; cursor:pointer; user-select:none; transition:.12s; position:relative; }
+  .wpn{ background:radial-gradient(120% 80% at 50% 22%, #241d12, #150f08); border:1px solid var(--line); border-radius:9px; padding:8px 4px 7px; text-align:center; cursor:pointer; user-select:none; transition:.12s; position:relative; }
   .wpn:hover{ border-color:#5a4d2e; }
   .wpn.sel{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset, 0 4px 14px rgba(224,172,76,.18); }
   .wpn .ico{ font-size:23px; line-height:1; }
@@ -147,9 +147,9 @@
               hit:{rock:.55,spear:.70,net:.15}, color:"#7a5a3a" },
     mammoth:{ label:"Mammoth",emoji:"🦣", size:[6,2], hp:[70,90], meat:600, step:0.9, kind:"prey",
               hit:{rock:.50,spear:.75,net:.10}, color:"#6b5540" },
-    wolf:   { label:"Wolf",   emoji:"🐺", size:[2,1], hp:[14,18], meat:25,  step:2.6, kind:"predator",
+    wolf:   { label:"Wolf",   emoji:"🐺", size:[2,1], hp:[8,11],  meat:25,  step:2.6, kind:"predator",
               attack:.26, bite:6,  hit:{rock:.40,spear:.60,net:.30}, color:"#8a8f96" },
-    bear:   { label:"Bear",   emoji:"🐻", size:[2,2], hp:[42,54], meat:220, step:1.5, kind:"predator",
+    bear:   { label:"Bear",   emoji:"🐻", size:[2,2], hp:[30,40], meat:220, step:1.5, kind:"predator",
               attack:.34, bite:9,  hit:{rock:.45,spear:.65,net:.20}, color:"#5a4632" },
   };
 
@@ -695,13 +695,19 @@
       ctx.lineCap="butt";
     } else if (type==="forest"){
       ctx.fillStyle="rgba(10,22,8,.35)"; ctx.fillRect(ox,oy,PX,PX);   // shaded understory
-      const trees = R()>0.5 ? [[0.36,0.52],[0.66,0.62]] : [[0.5,0.56]];
-      for (const [fx,fy] of trees){ const tx=ox+PX*fx, ty=oy+PX*fy, rr=PX*(0.19+R()*0.05);
-        ctx.fillStyle="rgba(0,0,0,.30)"; ctx.beginPath(); ctx.ellipse(tx,ty+rr*0.95,rr*1.05,rr*0.4,0,0,7); ctx.fill();
-        ctx.fillStyle="#3a2416"; ctx.fillRect(tx-1.5, ty-rr*0.2, 3, rr*1.0);   // trunk
-        for (const [col,sc,dx,dy] of [["#22461c",1.0,0,0],["#2e5824",0.78,-rr*0.22,-rr*0.28],["#3a6d2d",0.5,-rr*0.34,-rr*0.5]]){
-          ctx.fillStyle=col; ctx.beginPath(); ctx.arc(tx+dx,ty+dy-rr*0.35,rr*sc,0,7); ctx.fill(); }
-        ctx.fillStyle="rgba(190,214,120,.18)"; ctx.beginPath(); ctx.arc(tx-rr*0.32,ty-rr*0.7,rr*0.32,0,7); ctx.fill(); }
+      // one full, well-formed tree (size + position jittered per tile) …
+      const tx=ox+PX*(0.42+R()*0.16), ty=oy+PX*0.58, rr=PX*(0.24+R()*0.05);
+      ctx.fillStyle="rgba(0,0,0,.32)"; ctx.beginPath(); ctx.ellipse(tx,ty+rr*0.85,rr*1.15,rr*0.42,0,0,7); ctx.fill();  // shadow
+      ctx.fillStyle="#3a2416"; ctx.fillRect(tx-2, ty-rr*0.25, 4, rr*1.05);                                            // trunk
+      for (const [col,sc,dx,dy] of [["#1f4019",1.0,0,rr*0.06],["#2b5422",0.82,-rr*0.30,-rr*0.18],
+                                    ["#2b5422",0.76,rr*0.30,-rr*0.14],["#37692b",0.6,-rr*0.04,-rr*0.44]]){
+        ctx.fillStyle=col; ctx.beginPath(); ctx.arc(tx+dx,ty+dy-rr*0.4,rr*sc,0,7); ctx.fill(); }                      // full crown
+      ctx.fillStyle="rgba(190,214,120,.16)"; ctx.beginPath(); ctx.arc(tx-rr*0.3,ty-rr*0.78,rr*0.3,0,7); ctx.fill();   // highlight
+      // … and sometimes a low shrub — two soft lobes so it reads as a bush, not a broken tree
+      if (R()>0.5){ const bx=ox+PX*(0.14+R()*0.12), by=oy+PX*0.82;
+        ctx.fillStyle="rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(bx+PX*0.05,by+PX*0.07,PX*0.14,PX*0.05,0,0,7); ctx.fill();
+        ctx.fillStyle="#274b1d"; ctx.beginPath(); ctx.arc(bx,by,PX*0.09,0,7); ctx.arc(bx+PX*0.11,by,PX*0.11,0,7); ctx.fill();
+        ctx.fillStyle="rgba(160,190,100,.14)"; ctx.beginPath(); ctx.arc(bx+PX*0.06,by-PX*0.04,PX*0.05,0,7); ctx.fill(); }
     } else if (type==="marsh"){
       // patchy wet mud: a few damp blotches at varied spots + one glint + a couple of leaning
       // reeds, all jittered per tile so the marsh reads organic rather than stamped
@@ -857,10 +863,15 @@
 
   // A dark hunter silhouette on a stone base, lit by a warm rim (so it reads on dark forest
   // too) and identified by a glowing weapon held aloft. Shared by the board and the unit panel.
+  // o.dance (a phase value) makes the body sway around the planted feet — a little idle
+  // hip-shake while the tribe waits for the hunt. null = stand still.
+  function danceIn(g,cx,piv,phase){ g.save();
+    if (phase!=null){ g.translate(cx+Math.sin(phase*2)*3, piv); g.rotate(Math.sin(phase)*0.11); g.translate(-cx,-piv); } }
   function paintHunter(g,cx,cy,s,weapon,o){
     o=o||{}; const W=WEAPONS[weapon];
     g.fillStyle="rgba(0,0,0,.32)"; g.beginPath(); g.ellipse(cx, cy+s*0.42, s*0.34, s*0.13, 0,0,7); g.fill();
     g.fillStyle="#4a4438"; g.beginPath(); g.ellipse(cx, cy+s*0.40, s*0.30, s*0.11, 0,0,7); g.fill();
+    danceIn(g, cx, cy+s*0.38, o.dance);                                           // body sways, base stays put
     g.save(); g.shadowColor="rgba(232,214,170,.55)"; g.shadowBlur=4;
     g.fillStyle = o.flash ? "#7a241a" : "#1b160f";
     g.beginPath(); g.arc(cx, cy-s*0.28, s*0.15, 0,7); g.fill();                   // head
@@ -878,15 +889,19 @@
       g.beginPath(); g.moveTo(cx+s*0.10,cy-s*0.09); g.lineTo(cx+s*0.36,cy-s*0.09);
       g.moveTo(cx+s*0.23,cy-s*0.22); g.lineTo(cx+s*0.23,cy+s*0.04); g.stroke(); }
     g.restore();
+    g.restore();                                                                  // end dance transform
   }
   // Runner: the same silhouette language, leaning into a sprint with an orange rim + motion streaks.
   function paintRunner(g,cx,cy,s,o){
     o=o||{}; const seed=o.seed||0;
     g.fillStyle="rgba(0,0,0,.3)"; g.beginPath(); g.ellipse(cx,cy+s*0.42,s*0.30,s*0.11,0,0,7); g.fill();
-    const dash=0.35+0.3*Math.sin(state.clock*10+seed);
-    g.strokeStyle="rgba(217,143,90,"+dash.toFixed(2)+")"; g.lineWidth=2; g.lineCap="round";
-    for (let i=0;i<3;i++){ const yy=cy-s*0.14+i*s*0.16; g.beginPath(); g.moveTo(cx-s*0.42, yy); g.lineTo(cx-s*0.16-i*3, yy); g.stroke(); }
-    g.lineCap="butt";
+    if (o.dance==null){                                                           // streaks only while actually running
+      const dash=0.35+0.3*Math.sin(state.clock*10+seed);
+      g.strokeStyle="rgba(217,143,90,"+dash.toFixed(2)+")"; g.lineWidth=2; g.lineCap="round";
+      for (let i=0;i<3;i++){ const yy=cy-s*0.14+i*s*0.16; g.beginPath(); g.moveTo(cx-s*0.42, yy); g.lineTo(cx-s*0.16-i*3, yy); g.stroke(); }
+      g.lineCap="butt";
+    }
+    danceIn(g, cx, cy+s*0.4, o.dance);
     g.save(); g.shadowColor=RUNNER.color; g.shadowBlur=6;
     g.fillStyle= o.flash? "#e86a4c" : "#221a11";
     g.beginPath(); g.arc(cx+s*0.12, cy-s*0.26, s*0.14, 0,7); g.fill();            // head forward
@@ -896,19 +911,22 @@
     rrectOn(g, cx-s*0.16, cy+s*0.18, s*0.11, s*0.20, 4); g.fill();                // trailing leg
     rrectOn(g, cx+s*0.06, cy+s*0.18, s*0.11, s*0.18, 4); g.fill();                // lead leg
     g.restore();
+    g.restore();                                                                  // end dance transform
   }
   function hpBar(cx,cy,s,frac,color){ const bw=s*0.9, bx=cx-bw/2, by=cy+s*0.52;
     ctx.fillStyle="rgba(0,0,0,.6)"; roundRect(bx,by,bw,3,1.5); ctx.fill();
     ctx.fillStyle=color; roundRect(bx,by,bw*Math.max(0,frac),3,1.5); ctx.fill(); }
+  // during placement the placed units do a little idle dance, each on its own phase
+  function idlePhase(x,y){ return state.phase==="placing" ? state.clock*3.3 + (x*1.7+y*0.9) : null; }
   function drawHunterToken(x,y,weapon,hidden,unit){
     const cx=(x+0.5)*PX, cy=(y+0.5)*PX, s=PX*0.86;
-    paintHunter(ctx, cx, cy, s, weapon, {flash: unit&&unit.flash>0, hidden});
+    paintHunter(ctx, cx, cy, s, weapon, {flash: unit&&unit.flash>0, hidden, dance: idlePhase(x,y)});
     if (unit && unit.hp<unit.maxhp) hpBar(cx,cy,s, unit.hp/unit.maxhp, "#8fd06a");
   }
   function drawRunner(rn,dt){
     const k=Math.min(1,dt*12); rn.rx+=(rn.x-rn.rx)*k; rn.ry+=(rn.y-rn.ry)*k;
     const cx=(rn.rx+0.5)*PX, cy=(rn.ry+0.5)*PX, s=PX*0.86;
-    paintRunner(ctx, cx, cy, s, {flash: rn.flash>0, seed: rn.seed||0});
+    paintRunner(ctx, cx, cy, s, {flash: rn.flash>0, seed: rn.seed||0, dance: idlePhase(rn.x,rn.y)});
     if (rn.hp<rn.maxhp) hpBar(cx,cy,s, rn.hp/rn.maxhp, "#d98f5a");
   }
 
@@ -1102,17 +1120,20 @@
     document.getElementById("roster").textContent="Herd: "+Object.keys(L.roster).map(k=>`${ANIMALS[k].emoji}×${L.roster[k]}`).join("  ");
     const wrap=document.getElementById("weapons"); wrap.innerHTML="";
     // each tile shows the actual hunter silhouette it places, painted onto a crisp mini-canvas
-    const mkTile=(key,name,role,count,paint)=>{
-      const el=document.createElement("div"); el.className="wpn"+(state.sel===key?" sel":"");
-      el.innerHTML=`<div class="nm">${name}</div><div class="rg">${role}</div><div class="ct">×${count}</div>`;
+    const mkTile=(key,name,role,count,color,paint)=>{
+      const sel=state.sel===key;
+      const el=document.createElement("div"); el.className="wpn"+(sel?" sel":"");
+      if (sel){ el.style.borderColor=color; el.style.boxShadow=`inset 0 0 0 1px ${color}, 0 3px 18px ${color}44`;
+        el.style.setProperty("--wc", color); }         // selected tile glows in its weapon's color
+      el.innerHTML=`<div class="nm">${name}</div><div class="rg">${role}</div><div class="ct"${sel?` style="color:${color}"`:""}>×${count}</div>`;
       const cv=document.createElement("canvas"); cv.className="ico"; const dpr=2;
       cv.width=52*dpr; cv.height=44*dpr; cv.style.width="52px"; cv.style.height="44px";
       el.insertBefore(cv, el.firstChild);
       const g=cv.getContext("2d"); g.scale(dpr,dpr); paint(g);
       el.onclick=()=>{ state.sel=key; state.selHunter=null; renderUI(); }; wrap.appendChild(el);
     };
-    for (const k in WEAPONS) mkTile(k, WEAPONS[k].name, WEAPONS[k].role, state.inv[k], g=>paintHunter(g,26,24,30,k,{}));
-    mkTile("runner", RUNNER.name, RUNNER.role, state.inv.runner, g=>paintRunner(g,26,24,30,{}));
+    for (const k in WEAPONS) mkTile(k, WEAPONS[k].name, WEAPONS[k].role, state.inv[k], WEAPONS[k].color, g=>paintHunter(g,26,24,30,k,{}));
+    mkTile("runner", RUNNER.name, RUNNER.role, state.inv.runner, RUNNER.color, g=>paintRunner(g,26,24,30,{}));
     const start=document.getElementById("start");
     start.disabled=state.phase!=="placing";
     start.textContent = state.phase==="won"?"You Win 🏆"
