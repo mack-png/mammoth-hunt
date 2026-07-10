@@ -7,7 +7,7 @@
 <style>
   /* Cool obsidian/slate baseline: the board's glowing weapons are the only saturated colour;
      a single restrained ember accent carries warmth (primary CTA, progress, level marks). */
-  :root{ --bg:#0b0d12; --panel:#141922; --panel2:#1b212c; --ink:#e8ecf3; --muted:#88919f; --line:#293040; --accent:#e0a24c; }
+  :root{ --bg:#0b0d12; --panel:#141922; --panel2:#1b212c; --ink:#e8ecf3; --muted:#9aa4b4; --line:#293040; --accent:#e0a24c; }
   *{ box-sizing:border-box; }
   html,body{ margin:0; min-height:100%; }
   body{ background:radial-gradient(1200px 700px at 30% -12%, #182031 0%, #0b0d12 62%); color:var(--ink);
@@ -41,21 +41,36 @@
   button:disabled{ opacity:.45; cursor:default; box-shadow:none; }
   .bar{ height:13px; background:#161b24; border-radius:7px; overflow:hidden; border:1px solid var(--line); margin-top:5px; }
   .bar>i{ display:block; height:100%; width:0; border-radius:7px; background:linear-gradient(90deg,#b9722a,#e6b959); transition:width .35s cubic-bezier(.3,1,.4,1); box-shadow:0 0 12px rgba(224,172,76,.4); }
-  .stat{ display:flex; justify-content:space-between; font-size:13px; margin:12px 0 0; }
-  .stat b{ color:var(--accent); }
-  .medals{ display:flex; justify-content:space-between; gap:6px; margin-top:6px; }
-  .medals .m{ flex:1; text-align:center; font-size:11px; color:var(--muted); background:#161b24; border:1px solid var(--line); border-radius:6px; padding:3px 2px; }
-  .medals .m.hit{ color:var(--ink); border-color:#3d4658; }
-  .medals .m b{ display:block; font-size:13px; }
+  /* Briefing: the three win/lose conditions, loud and high-contrast */
+  .brief{ display:flex; gap:6px; margin:11px 0 6px; }
+  .brief .c{ flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:7px 3px 6px; text-align:center; line-height:1.15; }
+  .brief .c b{ display:block; font-size:14.5px; color:var(--ink); font-weight:700; }
+  .brief .c em{ font-style:normal; font-size:10px; color:var(--muted); }
+  .bar{ position:relative; }
+  .bar .tk{ position:absolute; top:0; bottom:0; width:2px; background:rgba(232,236,243,.4); }
+  .meatline{ font-size:12.5px; color:var(--muted); margin-top:6px; display:flex; justify-content:space-between; align-items:baseline; }
+  .meatline b{ color:var(--ink); font-weight:700; }
+  .mnow{ color:var(--accent); font-weight:600; }
+  .worth{ color:var(--muted); font-size:11.5px; }
+  /* Contextual detail for the selected unit — glows in that weapon's colour */
+  .udetail{ font-size:12.5px; line-height:1.45; color:var(--ink); background:var(--panel2); border-left:3px solid var(--line); border-radius:0 8px 8px 0; padding:8px 10px; margin:9px 0 2px; min-height:36px; }
+  details.disc{ margin-top:10px; border-top:1px solid var(--line); }
+  details.disc summary{ cursor:pointer; font-size:12.5px; color:var(--muted); padding:9px 0 5px; list-style:none; user-select:none; }
+  details.disc summary::-webkit-details-marker{ display:none; }
+  details.disc summary::before{ content:"▸  "; color:var(--accent); }
+  details.disc[open] summary::before{ content:"▾  "; }
+  details.disc summary:hover{ color:var(--ink); }
   .starstot{ font-size:13px; color:var(--accent); }
-  #log{ height:132px; overflow-y:auto; font-size:12px; color:var(--muted); background:#0e121a; border:1px solid var(--line); border-radius:9px; padding:8px 9px; margin-top:11px; }
-  #log div{ margin-bottom:3px; }
+  #log{ height:120px; overflow-y:auto; font-size:12.5px; color:var(--muted); background:#0e121a; border:1px solid var(--line); border-radius:9px; padding:8px 9px; margin-top:4px; }
+  #log div{ margin-bottom:4px; }
   #log div:first-child{ color:#c2cad6; }
-  .legend{ font-size:11px; color:var(--muted); margin-top:11px; display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; }
+  .legend{ font-size:11.5px; color:var(--muted); margin-top:9px; display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
   .legend i{ display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:6px; vertical-align:middle; box-shadow:inset 0 0 0 1px rgba(0,0,0,.3); }
-  .tips{ font-size:11.5px; color:var(--muted); margin-top:9px; line-height:1.5; border-top:1px solid var(--line); padding-top:9px; }
-  .tips b{ color:#cdbf9f; font-weight:600; }
-  .hint{ font-size:12px; color:var(--muted); margin-top:9px; min-height:30px; }
+  .tips{ font-size:12.5px; color:var(--muted); line-height:1.5; padding-top:2px; }
+  .tips div{ margin-bottom:6px; }
+  .tips b{ color:#c8d0dc; font-weight:600; }
+  .tips .red{ color:#e0574a; }
+  .hint{ font-size:12.5px; color:var(--muted); margin-top:9px; min-height:28px; line-height:1.45; }
   /* Narrow screens: stack canvas over a full-width panel, trim chrome. */
   @media (max-width:720px){
     body{ padding:10px; gap:12px; }
@@ -78,23 +93,40 @@
 
   <div class="panel">
     <div class="lvl"><span>Level <span class="n" id="levelno">1</span> — <b id="levelname">First Blood</b></span><span id="starsTotal" class="starstot"></span></div>
-    <div class="roster" id="roster"></div>
-    <div class="stat"><span>Meat this level</span><span><b id="meat">0</b> lbs</span></div>
-    <div class="bar"><i id="meatbar"></i></div>
-    <div class="medals" id="medalrow"></div>
 
+    <!-- THE BRIEFING — the three things that decide the hunt -->
+    <div class="brief" id="objective"></div>
+
+    <!-- your quarry -->
+    <div class="roster" id="roster"></div>
+
+    <!-- progress toward the goal, with medal marks on the bar -->
+    <div class="bar"><i id="meatbar"></i></div>
+    <div class="meatline"><span><span class="mnow" id="meatnow">0</span> / <b id="meatgoal">0</b> lbs bagged</span><span id="medalnow"></span></div>
+
+    <!-- your tools -->
     <div class="weapons" id="weapons"></div>
+    <div class="udetail" id="udetail"></div>
+
     <div class="row" style="display:flex; gap:8px;">
-      <button id="start" style="flex:1">Start Level ▶</button>
+      <button id="start" style="flex:1">Start the Hunt ▶</button>
       <button id="reset" class="ghost">≡ Levels</button>
     </div>
     <div class="hint" id="hint"></div>
 
-    <div class="tips">
-      <b>🔱 Spear</b> 8 adjacent tiles, heavy. <b>🪨 Rock</b> throws 2 straight (↑↓←→) — beware: it hits the first ally in its line. <b>🕸️ Net</b> no damage; snares small prey &amp; roots big game. <b>🏃 Runner</b> chases and tackles on contact. <b>🌲 Forest</b> hides hunters. <b style="color:#e0574a">Red</b> tiles are entry points. Watch the timer &amp; don't lose more hunters than the level allows.
-    </div>
-    <div class="legend" id="legend"></div>
-    <div id="log"></div>
+    <!-- dig-to-find: full rules + terrain, and the event log -->
+    <details class="disc">
+      <summary>How to hunt</summary>
+      <div class="tips">
+        <div><b>🔱 Spear</b> — strikes the 8 tiles around it. Heavy hit, short reach.</div>
+        <div><b>🪨 Rock</b> — throws 2 tiles each way (↑ ↓ ← →). Hits the first thing in its line — even an ally.</div>
+        <div><b>🕸️ Net</b> — no damage; snares small prey outright, roots big game in place.</div>
+        <div><b>🏃 Runner</b> — mobile; chases the nearest animal and tackles on contact. No forest cover.</div>
+        <div><b>🌲 Forest</b> hides hunters from predators. <b class="red">Red</b> tiles are where animals enter — your range can't cover them.</div>
+        <div class="legend" id="legend"></div>
+      </div>
+    </details>
+    <details class="disc"><summary>Hunt log</summary><div id="log"></div></details>
   </div>
 
 <script>
@@ -1107,19 +1139,34 @@
     ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 
   // ---- UI --------------------------------------------------------------
+  const UNIT_DESC = {
+    rock:"🪨 Rock — throws 2 tiles each way. Hits the first thing in its line, even an ally. Light hit.",
+    spear:"🔱 Spear — strikes the 8 tiles around it. Heavy damage, short reach.",
+    net:"🕸️ Net — no damage; snares small prey outright, roots big game in place.",
+    runner:"🏃 Runner — mobile; chases the nearest animal and tackles it. No forest cover.",
+  };
   function renderMeat(){ const th=thresholds(LEVELS[state.levelIdx]);
-    document.getElementById("meat").textContent=state.meat;
-    document.getElementById("meatbar").style.width=Math.min(100,state.meat/th.gold*100)+"%";
-    const tiers=[["bronze",1],["silver",2],["gold",3]];
-    document.getElementById("medalrow").innerHTML = tiers.map(([k,m])=>
-      `<div class="m${state.meat>=th[k]?" hit":""}"><b>${MEDAL_ICON[m]}</b>${th[k]} lbs</div>`).join(""); }
+    document.getElementById("meatnow").textContent=state.meat;
+    document.getElementById("meatgoal").textContent=th.bronze;
+    const bar=document.getElementById("meatbar"), wrap=bar.parentElement;
+    bar.style.width=Math.min(100,state.meat/th.gold*100)+"%";
+    wrap.querySelectorAll(".tk").forEach(e=>e.remove());            // medal marks on the bar (gold = far end)
+    for (const k of ["bronze","silver"]){ const t=document.createElement("i"); t.className="tk"; t.style.left=(th[k]/th.gold*100)+"%"; wrap.appendChild(t); }
+    const m=medalFor(state.meat,th);
+    document.getElementById("medalnow").innerHTML = m ? `<span class="mnow">${MEDAL_ICON[m]} ${MEDAL_NAME[m]}</span>` : "";
+  }
   function renderUI(){
     const L=LEVELS[state.levelIdx];
     document.getElementById("levelno").textContent=state.levelIdx+1;
     document.getElementById("levelname").textContent=L.name;
     document.getElementById("starsTotal").textContent = "★ "+totalStars()+"/"+(LEVELS.length*3);
+    const th=thresholds(L);
+    document.getElementById("objective").innerHTML =
+      `<div class="c"><b>🥩 ${th.bronze}</b><em>lbs to clear</em></div>`+
+      `<div class="c"><b>💀 ${L.maxLoss}</b><em>hunters you can lose</em></div>`+
+      `<div class="c"><b>⏱ ${L.time}s</b><em>on the clock</em></div>`;
     renderMeat();
-    document.getElementById("roster").textContent="Herd: "+Object.keys(L.roster).map(k=>`${ANIMALS[k].emoji}×${L.roster[k]}`).join("  ");
+    document.getElementById("roster").innerHTML = "<b>Herd:</b> "+Object.keys(L.roster).map(k=>`${ANIMALS[k].emoji}×${L.roster[k]}`).join("  ")+` <span class="worth">· ~${levelTotalMeat(L)} lbs on the hoof</span>`;
     const wrap=document.getElementById("weapons"); wrap.innerHTML="";
     // each tile shows the actual hunter silhouette it places, painted onto a crisp mini-canvas
     const mkTile=(key,name,role,count,color,paint)=>{
@@ -1136,13 +1183,16 @@
     };
     for (const k in WEAPONS) mkTile(k, WEAPONS[k].name, WEAPONS[k].role, state.inv[k], WEAPONS[k].color, g=>paintHunter(g,26,24,30,k,{}));
     mkTile("runner", RUNNER.name, RUNNER.role, state.inv.runner, RUNNER.color, g=>paintRunner(g,26,24,30,{}));
+    { const sel=state.sel, det=document.getElementById("udetail");           // contextual detail for the selected unit
+      det.textContent = (UNIT_DESC[sel]||"") + (sel && sel!=="runner" ? " · Stand in forest to hide from predators." : "");
+      det.style.borderLeftColor = sel==="runner" ? RUNNER.color : ((WEAPONS[sel]&&WEAPONS[sel].color) || "#293040"); }
     const start=document.getElementById("start");
     start.disabled=state.phase!=="placing";
     start.textContent = state.phase==="won"?"You Win 🏆"
       : state.phase==="gameover"?"Game Over"
       : state.phase==="menu"?"Pick a hunt ↑"
       : state.phase==="results"?(state.result&&state.result.success?"Cleared ✓":"Failed ✗")
-      : state.phase==="running"?"Hunting…":"Start Level ▶";
+      : state.phase==="running"?"Hunting…":"Start the Hunt ▶";
     document.getElementById("hint").textContent=defaultHint();
     document.getElementById("legend").innerHTML=Object.values(TERRAIN).map(t=>`<span><i style="background:${t.color}"></i>${t.name} ×${t.speed.toFixed(2)}</span>`).join("");
   }
@@ -1152,7 +1202,7 @@
     if (state.phase==="gameover") return "Out of attempts — click the board for the level menu.";
     if (state.phase==="results") return state.result && state.result.success ? "Click the board to continue." : "Click the board to retry this level.";
     if (state.phase==="running") return "The hunt is on — prey flee, predators close in.";
-    return `${state.attempts} attempt${state.attempts===1?"":"s"} left. Ghosts show where the herd enters. Preview range, place a unit · tap/click a placed unit to remove.`;
+    return `Tap to place · tap a placed unit to remove. Ghost markers show where the herd enters. ${state.attempts} attempt${state.attempts===1?"":"s"} left.`;
   }
   function log(msg){ const el=document.getElementById("log"); const d=document.createElement("div"); d.textContent=msg;
     el.prepend(d); while (el.children.length>60) el.lastChild.remove(); }
