@@ -69,7 +69,7 @@
     <div class="weapons" id="weapons"></div>
     <div class="row" style="display:flex; gap:8px;">
       <button id="start" style="flex:1">Start Level ▶</button>
-      <button id="reset" class="ghost">Restart</button>
+      <button id="reset" class="ghost">≡ Levels</button>
     </div>
     <div class="hint" id="hint"></div>
 
@@ -825,7 +825,8 @@
     const vg=ctx.createRadialGradient(N*PX/2,N*PX/2,N*PX*0.3,N*PX/2,N*PX/2,N*PX*0.72);
     vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,.34)");
     ctx.fillStyle=vg; ctx.fillRect(0,0,N*PX,N*PX);
-    if (state.phase==="won") drawWin();
+    if (state.phase==="menu") drawMenu();
+    else if (state.phase==="won") drawWin();
     else if (state.phase==="results") drawResults();
     else if (state.phase==="gameover") drawGameover();
   }
@@ -896,9 +897,34 @@
     ctx.fillText(`You fell at ${LEVELS[state.levelIdx].name} — level ${state.levelIdx+1}.`, W/2, W*0.39);
     overlayStats([["Levels cleared",s.cleared],["Animals caught",s.caught],["Meat harvested",s.meat+" lbs"],["Hunters lost",s.huntersLost]], W*0.49);
     ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
-    ctx.fillText("↻  Click to start over", W/2, W*0.86);
+    ctx.fillText("↻  Click for the level menu", W/2, W*0.86);
   }
 
+  function showMenu(){ if(!state) startLevel(0); state.phase="menu"; state.hover=null; state.selHunter=null; renderUI(); }
+  function drawMenu(){
+    const W=N*PX;
+    ctx.fillStyle="#14110b"; ctx.fillRect(0,0,W,W);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle="#e6b959"; ctx.font="bold 26px ui-sans-serif,system-ui"; ctx.fillText("🦣 Choose a Hunt", W/2, 38);
+    ctx.fillStyle="#9b8f78"; ctx.font="13px ui-sans-serif,system-ui"; ctx.fillText("★ "+totalStars()+" / "+(LEVELS.length*3)+" stars", W/2, 62);
+    const cols=2, ox=20, oy=84, gapx=16, gapy=12, cardW=(W-2*ox-gapx)/cols, cardH=84;
+    state._menu={cols,ox,oy,gapx,gapy,cardW,cardH};
+    for (let i=0;i<LEVELS.length;i++){
+      const cx=ox+(i%cols)*(cardW+gapx), cy=oy+Math.floor(i/cols)*(cardH+gapy);
+      const unlocked = i===0 || bestMedals[i-1]>=1;
+      ctx.fillStyle=unlocked?"#241d12":"#191410"; roundRect(cx,cy,cardW,cardH,10); ctx.fill();
+      ctx.strokeStyle=unlocked?"#5a4d2e":"#241f16"; ctx.lineWidth=1.5; roundRect(cx,cy,cardW,cardH,10); ctx.stroke();
+      ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+      ctx.fillStyle=unlocked?"#efe6d4":"#5a5140"; ctx.font="bold 15px ui-sans-serif,system-ui";
+      ctx.fillText(`${i+1}. ${LEVELS[i].name}`, cx+14, cy+28);
+      ctx.font="17px serif"; ctx.fillStyle=unlocked?"#cdbf9f":"#4a4231";
+      ctx.fillText(Object.keys(LEVELS[i].roster).map(k=>ANIMALS[k].emoji).join(" "), cx+14, cy+56);
+      ctx.textAlign="right"; ctx.textBaseline="middle"; ctx.font="30px serif";
+      ctx.fillText(unlocked ? (bestMedals[i]?MEDAL_ICON[bestMedals[i]]:"·") : "🔒", cx+cardW-16, cy+cardH/2);
+    }
+    ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="#9b8f78"; ctx.font="12px ui-sans-serif,system-ui";
+    ctx.fillText("Click a hunt to play · clear one to unlock the next", W/2, W-16);
+  }
   function drawWin(){
     const W=N*PX, s=state.stats;
     ctx.fillStyle="rgba(10,8,4,.84)"; ctx.fillRect(0,0,W,W);
@@ -916,7 +942,7 @@
       ctx.textAlign="left";  ctx.fillStyle="#efe6d4"; ctx.font="bold 16px ui-sans-serif,system-ui"; ctx.fillText(r[1], W/2+12, y);
       ctx.font="16px ui-sans-serif,system-ui"; });
     ctx.textAlign="center"; ctx.fillStyle="#e6b959"; ctx.font="bold 15px ui-sans-serif,system-ui";
-    ctx.fillText("▶  Click anywhere to hunt again", W/2, W*0.86);
+    ctx.fillText("▶  Click for the level menu", W/2, W*0.86);
   }
   function roundRect(x,y,w,h,r){ r=Math.min(r,w/2,h/2);
     ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
@@ -948,14 +974,16 @@
     start.disabled=state.phase!=="placing";
     start.textContent = state.phase==="won"?"You Win 🏆"
       : state.phase==="gameover"?"Game Over"
+      : state.phase==="menu"?"Pick a hunt ↑"
       : state.phase==="results"?(state.result&&state.result.success?"Cleared ✓":"Failed ✗")
       : state.phase==="running"?"Hunting…":"Start Level ▶";
     document.getElementById("hint").textContent=defaultHint();
     document.getElementById("legend").innerHTML=Object.values(TERRAIN).map(t=>`<span><i style="background:${t.color}"></i>${t.name} ×${t.speed.toFixed(2)}</span>`).join("");
   }
   function defaultHint(){
-    if (state.phase==="won") return "Press Restart to hunt again.";
-    if (state.phase==="gameover") return "Out of attempts — click the board to start over.";
+    if (state.phase==="menu") return "Choose a hunt from the board. Clear one to unlock the next.";
+    if (state.phase==="won") return "Click the board for the level menu.";
+    if (state.phase==="gameover") return "Out of attempts — click the board for the level menu.";
     if (state.phase==="results") return state.result && state.result.success ? "Click the board to continue." : "Click the board to retry this level.";
     if (state.phase==="running") return "The hunt is on — prey flee, predators close in.";
     return `${state.attempts} attempt${state.attempts===1?"":"s"} left. Ghosts show where the herd enters. Hover to preview range · click to place · click a hunter to remove.`;
@@ -977,10 +1005,18 @@
     const j=state.runners.findIndex(r=>r.x===c.x&&r.y===c.y);
     if(j>=0){ state.inv.runner++; state.runners.splice(j,1); renderUI(); } });
   canvas.addEventListener("pointerdown",(e)=>{
-    if (state.phase==="won" || state.phase==="gameover"){ state=null; startLevel(0); return; }
+    if (state.phase==="menu"){
+      const m=state._menu; if(!m) return; const rct=canvas.getBoundingClientRect();
+      const rx=(e.clientX-rct.left)/rct.width*N*PX, ry=(e.clientY-rct.top)/rct.height*N*PX;
+      for (let i=0;i<LEVELS.length;i++){ const cx=m.ox+(i%m.cols)*(m.cardW+m.gapx), cy=m.oy+Math.floor(i/m.cols)*(m.cardH+m.gapy);
+        if (rx>=cx&&rx<=cx+m.cardW&&ry>=cy&&ry<=cy+m.cardH){ if (i===0 || bestMedals[i-1]>=1) startLevel(i); return; } }
+      return;
+    }
+    if (state.phase==="won" || state.phase==="gameover"){ showMenu(); return; }
     if (state.phase==="results"){
-      if (state.result.success) startLevel(state.levelIdx + 1);   // advance (fresh attempts)
-      else startLevel(state.levelIdx);                            // retry (keeps decremented attempts)
+      if (state.result.success && state.levelIdx<LEVELS.length-1) startLevel(state.levelIdx + 1);  // advance
+      else if (state.result.success) showMenu();                                                    // cleared last → menu
+      else startLevel(state.levelIdx);                                                              // retry
       return;
     }
     if (state.phase!=="placing") return;
@@ -1014,7 +1050,7 @@
     state.phase="running"; state.selHunter=null; state.hover=null;
     log(`The herd approaches — ${state.queue.length} animals · ${LEVELS[state.levelIdx].time}s.`); renderUI();
   };
-  document.getElementById("reset").onclick=()=>{ state=null; startLevel(0); };
+  document.getElementById("reset").onclick=()=> showMenu();
 
   // ---- Boot ------------------------------------------------------------
   function frame(t){
@@ -1041,7 +1077,7 @@
     run(seconds=30, dt=1/30){ let t=0; while(t<seconds && state.phase==="running"){ step(dt); t+=dt; } return {phase:state.phase, meat:state.meat, level:state.levelIdx+1}; },
   };
 
-  startLevel(0);
+  startLevel(0); showMenu();
   requestAnimationFrame(frame);
 })();
 </script>
